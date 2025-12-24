@@ -1,4 +1,4 @@
-# 🚀 HIP-3 Equity Perpetuals Dashboard
+# 🚀 Voyager HIP-3 Equity Perpetuals Dashboard
 
 A comprehensive Streamlit dashboard for tracking equity perpetuals on Hyperliquid with market data, technicals, derivatives, and options analytics.
 
@@ -53,5 +53,9 @@ streamlit run app.py
 
 The dashboard will open at `http://localhost:8501`
 
+## 📝 Notes
 
-
+- Data is cached for performance (15 minutes for API calls, 1 hour for candles)
+- The dashboard fetches data from Hyperliquid API and Yahoo Finance
+- Selecting many symbols may slow down loading - start with a few and add more as needed
+- Auto-refresh option available in sidebar (5-minute intervals)

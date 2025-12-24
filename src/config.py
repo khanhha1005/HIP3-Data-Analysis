@@ -19,28 +19,28 @@ TICKERS = [s.split(":")[-1] for s in SYMBOLS]
 API_URL = "https://api.hyperliquid.xyz/info"
 CACHE_TTL_SECONDS = 15 * 60
 
-# Enhanced color palette - Cyberpunk/Neon theme
+# Neon Glassmorphism color palette - Dark with vibrant accents
 COLORS = {
-    "background": "#0a0a0f",
-    "card": "#12121a",
-    "card_border": "#1e1e2e",
-    "text": "#e4e4e7",
-    "text_muted": "#71717a",
-    "accent": "#fbbf24",
-    "accent_glow": "#f59e0b",
-    "green": "#22c55e",
-    "green_glow": "#16a34a",
-    "red": "#ef4444",
-    "red_glow": "#dc2626",
+    "background": "#0f0f23",
+    "card": "rgba(255, 255, 255, 0.05)",
+    "card_border": "rgba(255, 255, 255, 0.1)",
+    "text": "#ffffff",
+    "text_muted": "#a0a0b8",
+    "accent": "#00d4ff",
+    "accent_glow": "#00a8cc",
+    "green": "#00ff88",
+    "green_glow": "#00cc6a",
+    "red": "#ff3366",
+    "red_glow": "#cc1a3d",
     "blue": "#3b82f6",
     "blue_glow": "#2563eb",
     "purple": "#a855f7",
     "purple_glow": "#9333ea",
-    "cyan": "#06b6d4",
-    "cyan_glow": "#0891b2",
-    "orange": "#f97316",
+    "cyan": "#00d4ff",
+    "cyan_glow": "#00a8cc",
+    "orange": "#ff6b35",
     "pink": "#ec4899",
-    "gray": "#52525b",
-    "gray_light": "#a1a1aa",
+    "gray": "#64748b",
+    "gray_light": "#94a3b8",
 }
 
