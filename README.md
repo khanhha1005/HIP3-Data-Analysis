@@ -16,36 +16,6 @@ The dashboard supports 26+ equity perpetuals including:
 - **flx:** CRCL
 - **vntl:** MAG7, SEMIS
 
-## 🚀 Deployment to Streamlit Community Cloud
-
-### Prerequisites
-
-1. A GitHub account
-2. A Streamlit Community Cloud account (free)
-
-### Steps
-
-1. **Push your code to GitHub**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin <your-github-repo-url>
-   git push -u origin main
-   ```
-
-2. **Deploy on Streamlit Cloud**
-   - Go to [share.streamlit.io](https://share.streamlit.io)
-   - Click "New app"
-   - Connect your GitHub repository
-   - Set the main file path: `app.py`
-   - Click "Deploy"
-
-3. **Configuration**
-   - The app uses `.streamlit/config.toml` for theme configuration
-   - `requirements.txt` contains all necessary dependencies
-   - No environment variables needed
-
 ### File Structure
 
 ```
@@ -83,20 +53,5 @@ streamlit run app.py
 
 The dashboard will open at `http://localhost:8501`
 
-## 📝 Notes
 
-- Data is cached for performance (15 minutes for API calls, 1 hour for candles)
-- The dashboard fetches data from Hyperliquid API and Yahoo Finance
-- Selecting many symbols may slow down loading - start with a few and add more as needed
-- Auto-refresh option available in sidebar (5-minute intervals)
-
-## 🔧 Configuration
-
-- **Lookback Period**: Adjustable in sidebar (7-120 days)
-- **Symbol Selection**: Multi-select dropdown with search functionality
-- **Data Freshness**: Displayed in sidebar (Funding: 1h, Options: 6h, Price: 4h)
-
-## 📄 License
-
-This project is for educational and analytical purposes.
 
