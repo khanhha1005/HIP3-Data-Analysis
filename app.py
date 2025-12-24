@@ -43,43 +43,43 @@ def main():
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         
         :root {
-            --bg-primary: #0f0f23;
-            --bg-secondary: #1a1a2e;
-            --bg-card: rgba(255, 255, 255, 0.05);
-            --bg-glass: rgba(255, 255, 255, 0.08);
-            --border-color: rgba(255, 255, 255, 0.1);
-            --accent: #00d4ff;
-            --accent-glow: #00a8cc;
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-card: rgba(255, 255, 255, 0.8);
+            --bg-glass: rgba(255, 255, 255, 0.9);
+            --border-color: rgba(0, 0, 0, 0.08);
+            --accent: #6366f1;
+            --accent-glow: #818cf8;
             --accent-purple: #a855f7;
             --accent-pink: #ec4899;
-            --green: #00ff88;
-            --red: #ff3366;
+            --green: #10b981;
+            --red: #f43f5e;
             --blue: #3b82f6;
             --purple: #8b5cf6;
-            --cyan: #00d4ff;
-            --text: #ffffff;
-            --text-muted: #a0a0b8;
-            --shadow-glow: 0 8px 32px rgba(0, 212, 255, 0.2);
+            --cyan: #06b6d4;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --shadow-glow: 0 8px 32px rgba(99, 102, 241, 0.15);
         }
         
         .stApp {
-            background: radial-gradient(ellipse at top, #1a1a3e 0%, #0f0f23 50%, #0a0a1a 100%);
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
             font-family: 'Inter', sans-serif;
             min-height: 100vh;
         }
         
-        /* Glassmorphism Header */
+        /* Glassmorphism Header - Light Theme */
         .main-header {
             text-align: center;
             padding: 50px 30px;
             margin: 20px 0 40px 0;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-radius: 32px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
             position: relative;
             overflow: hidden;
         }
@@ -93,7 +93,7 @@ def main():
             height: 100%;
             background: linear-gradient(90deg, 
                 transparent, 
-                rgba(0, 212, 255, 0.1), 
+                rgba(99, 102, 241, 0.1), 
                 transparent
             );
             animation: shimmer 3s infinite;
@@ -108,7 +108,7 @@ def main():
             font-family: 'Inter', sans-serif;
             font-size: 3.5rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #00d4ff 0%, #a855f7 50%, #ec4899 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
             background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -116,7 +116,6 @@ def main():
             animation: gradient-shift 4s ease infinite;
             margin-bottom: 16px;
             letter-spacing: -2px;
-            text-shadow: 0 0 40px rgba(0, 212, 255, 0.5);
             position: relative;
             z-index: 1;
         }
@@ -136,13 +135,12 @@ def main():
             z-index: 1;
         }
         
-        /* Glassmorphism Metrics */
+        /* Glassmorphism Metrics - Light Theme */
         div[data-testid="stMetricValue"] {
             font-family: 'JetBrains Mono', monospace;
             font-size: 1.6rem;
             font-weight: 700;
             color: var(--text);
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
         }
         
         div[data-testid="stMetricLabel"] {
@@ -155,14 +153,14 @@ def main():
         }
         
         .stMetric {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
@@ -177,7 +175,7 @@ def main():
             height: 100%;
             background: linear-gradient(90deg, 
                 transparent, 
-                rgba(0, 212, 255, 0.1), 
+                rgba(99, 102, 241, 0.1), 
                 transparent
             );
             transition: left 0.5s;
@@ -185,23 +183,23 @@ def main():
         
         .stMetric:hover {
             transform: translateY(-4px) scale(1.02);
-            box-shadow: 0 12px 40px rgba(0, 212, 255, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            border-color: rgba(0, 212, 255, 0.3);
+            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 1);
+            border-color: rgba(99, 102, 241, 0.3);
         }
         
         .stMetric:hover::before {
             left: 100%;
         }
         
-        /* Modern Tab styling */
+        /* Modern Tab styling - Light Theme */
         .stTabs [data-baseweb="tab-list"] {
             gap: 8px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
         
         .stTabs [data-baseweb="tab"] {
@@ -216,30 +214,30 @@ def main():
         }
         
         .stTabs [data-baseweb="tab"]:hover {
-            background: rgba(0, 212, 255, 0.1);
+            background: rgba(99, 102, 241, 0.1);
             color: var(--accent);
             transform: translateY(-2px);
         }
         
         .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%) !important;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%) !important;
             color: var(--text) !important;
-            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(0, 212, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.2),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(99, 102, 241, 0.3);
         }
         
-        /* Glass Card styling */
+        /* Glass Card styling - Light Theme */
         .info-card {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 32px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
             margin-bottom: 28px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
         
         .card-title {
@@ -251,78 +249,76 @@ def main():
             display: flex;
             align-items: center;
             gap: 12px;
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
         }
         
-        /* Glass Sidebar */
+        /* Glass Sidebar - Light Theme */
         section[data-testid="stSidebar"] {
-            background: rgba(26, 26, 46, 0.8) !important;
+            background: rgba(248, 250, 252, 0.95) !important;
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
         }
         
         section[data-testid="stSidebar"] .stMarkdown h3 {
             font-family: 'Inter', sans-serif;
             color: var(--accent);
             font-weight: 700;
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
         }
         
-        /* Glass Dataframe */
+        /* Glass Dataframe - Light Theme */
         .stDataFrame {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
         
-        /* Glass Expander */
+        /* Glass Expander - Light Theme */
         .streamlit-expanderHeader {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 16px;
             font-family: 'Inter', sans-serif;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
         }
         
         .streamlit-expanderHeader:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(0, 212, 255, 0.3);
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(99, 102, 241, 0.3);
         }
         
-        /* Neon Scrollbar */
+        /* Modern Scrollbar - Light Theme */
         ::-webkit-scrollbar {
             width: 12px;
             height: 12px;
         }
         
         ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 10px;
         }
         
         ::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, var(--accent) 0%, var(--accent-purple) 100%);
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
         }
         
         ::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(135deg, var(--accent-glow) 0%, var(--accent-purple) 100%);
-            box-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
         }
         
-        /* Glass Alert boxes */
+        /* Glass Alert boxes - Light Theme */
         .stSuccess, .stInfo, .stWarning, .stError {
             border-radius: 20px;
             font-family: 'Inter', sans-serif;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.08);
             backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
         }
         
         /* Typography */
@@ -331,15 +327,12 @@ def main():
             color: var(--text) !important;
         }
         
-        h2 {
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }
-        
         code {
             font-family: 'JetBrains Mono', monospace !important;
-            background: rgba(0, 212, 255, 0.1);
+            background: rgba(99, 102, 241, 0.1);
             padding: 2px 6px;
             border-radius: 4px;
+            color: var(--accent);
         }
         
         /* Main content area */
@@ -348,14 +341,14 @@ def main():
             padding-bottom: 2rem;
         }
         
-        /* Selection and inputs */
+        /* Selection and inputs - Light Theme */
         .stSelectbox, .stMultiselect, .stSlider {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 12px;
         }
         
-        /* Button styling */
+        /* Button styling - Light Theme */
         .stButton > button {
             background: linear-gradient(135deg, var(--accent) 0%, var(--accent-purple) 100%);
             color: white;
@@ -364,12 +357,12 @@ def main():
             padding: 0.5rem 1.5rem;
             font-weight: 600;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
         }
         
         .stButton > button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 30px rgba(0, 212, 255, 0.5);
+            box-shadow: 0 6px 30px rgba(99, 102, 241, 0.5);
         }
         </style>
         """,

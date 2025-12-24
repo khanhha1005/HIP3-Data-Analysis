@@ -55,13 +55,13 @@ def create_price_chart(df: pd.DataFrame, ticker: str, ma: Dict[str, pd.Series]) 
     )
 
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         xaxis_rangeslider_visible=False,
         height=450,
         margin=dict(l=10, r=10, t=30, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -79,7 +79,7 @@ def create_rsi_chart(df: pd.DataFrame, rsi_series: pd.Series, ticker: str) -> go
             name="RSI(14)",
             line=dict(color=COLORS["purple"], width=2),
             fill="tozeroy",
-            fillcolor="rgba(0, 212, 255, 0.15)",
+            fillcolor="rgba(99, 102, 241, 0.12)",
         )
     )
 
@@ -88,12 +88,12 @@ def create_rsi_chart(df: pd.DataFrame, rsi_series: pd.Series, ticker: str) -> go
     fig.add_hline(y=50, line_dash="dot", line_color=COLORS["gray"])
 
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         yaxis=dict(range=[0, 100]),
         height=220,
         margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -138,12 +138,12 @@ def create_macd_chart(
     )
 
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         height=220,
         margin=dict(l=10, r=10, t=30, b=10),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -168,11 +168,11 @@ def create_volume_chart(df: pd.DataFrame, ticker: str) -> go.Figure:
     )
 
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         height=180,
         margin=dict(l=10, r=10, t=30, b=10),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -215,12 +215,12 @@ def create_funding_chart(funding_df: pd.DataFrame, ticker: str) -> go.Figure:
     fig.add_hline(y=0, line_dash="solid", line_color=COLORS["gray"])
 
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         height=280,
         margin=dict(l=10, r=10, t=30, b=10),
         yaxis_tickformat=".1%",
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -237,7 +237,7 @@ def create_long_short_pie(long_ratio: float, ticker: str) -> go.Figure:
         hole=0.6,
         marker=dict(
             colors=[COLORS["green"], COLORS["red"]],
-            line=dict(color="rgba(255, 255, 255, 0.2)", width=2)
+            line=dict(color="rgba(0, 0, 0, 0.1)", width=2)
         ),
         textinfo="percent",
         textfont=dict(size=14, color="white", family="JetBrains Mono"),
@@ -256,13 +256,13 @@ def create_long_short_pie(long_ratio: float, ticker: str) -> go.Figure:
     )
     
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         height=250,
         margin=dict(l=10, r=10, t=30, b=10),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -286,7 +286,7 @@ def create_skew_pie(put_iv: float, call_iv: float, ticker: str) -> go.Figure:
         hole=0.6,
         marker=dict(
             colors=[COLORS["red"], COLORS["green"]],
-            line=dict(color="rgba(255, 255, 255, 0.2)", width=2)
+            line=dict(color="rgba(0, 0, 0, 0.1)", width=2)
         ),
         textinfo="percent",
         textfont=dict(size=14, color="white", family="JetBrains Mono"),
@@ -313,13 +313,13 @@ def create_skew_pie(put_iv: float, call_iv: float, ticker: str) -> go.Figure:
     )
     
     fig.update_layout(
-        template="plotly_dark",
+        template="plotly_white",
         height=250,
         margin=dict(l=10, r=10, t=30, b=10),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
 
@@ -350,7 +350,7 @@ def create_historical_volatility_chart(hist_vol_df: pd.DataFrame, ticker: str) -
             mode="lines",
             line=dict(color=COLORS["purple"], width=2),
             fill="tozeroy",
-            fillcolor="rgba(0, 212, 255, 0.15)",
+            fillcolor="rgba(99, 102, 241, 0.12)",
         )
     )
     
@@ -365,14 +365,14 @@ def create_historical_volatility_chart(hist_vol_df: pd.DataFrame, ticker: str) -
     
     fig.update_layout(
         title=dict(text=f"{ticker} Historical Volatility (20-period, Annualized)", font=dict(size=14)),
-        template="plotly_dark",
+        template="plotly_white",
         height=300,
         margin=dict(l=10, r=10, t=50, b=10),
         xaxis_title="Time",
         yaxis_title="Volatility",
         yaxis_tickformat=".0%",
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
     
@@ -437,15 +437,15 @@ def create_iv_smile_chart(options_data: Dict[str, Any], ticker: str) -> go.Figur
     
     fig.update_layout(
         title=dict(text=f"{ticker} Implied Volatility Smile", font=dict(size=14)),
-        template="plotly_dark",
+        template="plotly_white",
         height=300,
         margin=dict(l=10, r=10, t=50, b=10),
         xaxis_title="Strike Price",
         yaxis_title="Implied Volatility",
         yaxis_tickformat=".0%",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        paper_bgcolor="rgba(15, 15, 35, 0)",
-        plot_bgcolor="rgba(15, 15, 35, 0)",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(255, 255, 255, 0)",
         font=dict(family="JetBrains Mono, monospace"),
     )
     

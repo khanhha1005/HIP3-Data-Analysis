@@ -19,28 +19,28 @@ TICKERS = [s.split(":")[-1] for s in SYMBOLS]
 API_URL = "https://api.hyperliquid.xyz/info"
 CACHE_TTL_SECONDS = 15 * 60
 
-# Neon Glassmorphism color palette - Dark with vibrant accents
+# Light Glassmorphism color palette - Clean and modern
 COLORS = {
-    "background": "#0f0f23",
-    "card": "rgba(255, 255, 255, 0.05)",
-    "card_border": "rgba(255, 255, 255, 0.1)",
-    "text": "#ffffff",
-    "text_muted": "#a0a0b8",
-    "accent": "#00d4ff",
-    "accent_glow": "#00a8cc",
-    "green": "#00ff88",
-    "green_glow": "#00cc6a",
-    "red": "#ff3366",
-    "red_glow": "#cc1a3d",
+    "background": "#f8fafc",
+    "card": "rgba(255, 255, 255, 0.9)",
+    "card_border": "rgba(0, 0, 0, 0.08)",
+    "text": "#1e293b",
+    "text_muted": "#64748b",
+    "accent": "#6366f1",
+    "accent_glow": "#818cf8",
+    "green": "#10b981",
+    "green_glow": "#34d399",
+    "red": "#f43f5e",
+    "red_glow": "#fb7185",
     "blue": "#3b82f6",
-    "blue_glow": "#2563eb",
+    "blue_glow": "#60a5fa",
     "purple": "#a855f7",
-    "purple_glow": "#9333ea",
-    "cyan": "#00d4ff",
-    "cyan_glow": "#00a8cc",
-    "orange": "#ff6b35",
+    "purple_glow": "#a78bfa",
+    "cyan": "#06b6d4",
+    "cyan_glow": "#22d3ee",
+    "orange": "#f97316",
     "pink": "#ec4899",
-    "gray": "#64748b",
-    "gray_light": "#94a3b8",
+    "gray": "#94a3b8",
+    "gray_light": "#cbd5e1",
 }
 
