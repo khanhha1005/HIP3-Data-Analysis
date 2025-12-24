@@ -1,4 +1,4 @@
-# 🚀 Voyager HIP-3 Equity Perpetuals Dashboard
+# 🚀 HIP-3 Equity Perpetuals Dashboard
 
 A comprehensive Streamlit dashboard for tracking equity perpetuals on Hyperliquid with market data, technicals, derivatives, and options analytics.
 
