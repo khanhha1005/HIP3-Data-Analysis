@@ -234,7 +234,7 @@ def main():
         """
         <div class="main-header">
             <div class="main-title">🚀 VOYAGER</div>
-            <div class="subtitle">HIP-3 Equity Perpetuals Analytics Dashboard</div>
+            <div class="subtitle">HIP-3 Perpetuals Analytics Dashboard</div>
         </div>
         """,
         unsafe_allow_html=True,
