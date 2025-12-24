@@ -1,0 +1,20 @@
+# Voyager HIP-3 Dashboard Dependencies
+# =====================================
+# Optimized for Streamlit Community Cloud deployment
+
+# Core Framework
+streamlit>=1.28.0,<2.0.0
+
+# Data Processing
+pandas>=2.0.0,<3.0.0
+numpy>=1.24.0,<2.0.0
+
+# API & Networking
+requests>=2.31.0,<3.0.0
+
+# Visualization
+plotly>=5.18.0,<6.0.0
+
+# Finance Data
+yfinance>=0.2.33,<1.0.0
+
