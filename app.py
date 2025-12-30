@@ -636,11 +636,13 @@ def main():
 
             st.markdown("#### Buy/Sell Volume Chart")
             st.caption(
-                "This chart displays daily trading volume with two bars per day: **green bars** represent buying volume "
-                "(when close price ≥ open price) and **red bars** represent selling volume (when close price < open price). "
-                "The height of each bar indicates the volume magnitude. This visualization helps identify periods of "
-                "accumulation (green dominance) versus distribution (red dominance), and can signal potential trend reversals "
-                "or continuation patterns based on volume-price relationships."
+                "This chart displays trading volume activity as percentage values, showing intraday fluctuations in buying and selling pressure. "
+                "**Green bars above the 0% line** represent buying volume (when close price ≥ open price), indicating accumulation and bullish sentiment. "
+                "**Red bars below the 0% line** represent selling volume (when close price < open price), indicating distribution and bearish sentiment. "
+                "The magnitude of each bar shows the relative strength of buying or selling pressure. Clusters of green bars suggest strong buying interest "
+                "and potential upward price movement, while clusters of red bars indicate selling pressure and potential downward movement. "
+                "This visualization helps identify periods of accumulation (green dominance) versus distribution (red dominance), "
+                "and can signal potential trend reversals or continuation patterns based on volume-price relationships."
             )
             st.plotly_chart(create_volume_chart(df, ticker), use_container_width=True, key=f"volume_{ticker}")
             st.markdown("---")
