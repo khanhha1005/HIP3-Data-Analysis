@@ -616,6 +616,14 @@ def main():
 
             with chart_col1:
                 if "rsi_series" in tech:
+                    st.markdown("#### RSI (Relative Strength Index) Chart")
+                    st.caption(
+                        "The **RSI(14)** is a momentum oscillator that measures the speed and magnitude of price movements on a scale of 0-100. "
+                        "The **red dashed line at 70** indicates **Overbought** conditions (potential sell signal), while the **green dashed line at 30** "
+                        "indicates **Oversold** conditions (potential buy signal). The **grey dotted line at 50** represents the neutral midpoint. "
+                        "When RSI crosses above 70, the asset may be overbought and due for a pullback. When RSI falls below 30, it may be oversold "
+                        "and due for a bounce. Divergences between RSI and price can signal potential trend reversals."
+                    )
                     st.plotly_chart(create_rsi_chart(df, tech["rsi_series"], ticker), use_container_width=True, key=f"rsi_{ticker}")
 
             with chart_col2:
