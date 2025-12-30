@@ -636,13 +636,11 @@ def main():
 
             st.markdown("#### Buy/Sell Volume Chart")
             st.caption(
-                "This chart displays trading volume activity as percentage values, showing intraday fluctuations in buying and selling pressure. "
-                "**Green bars above the 0% line** represent buying volume (when close price ≥ open price), indicating accumulation and bullish sentiment. "
-                "**Red bars below the 0% line** represent selling volume (when close price < open price), indicating distribution and bearish sentiment. "
-                "The magnitude of each bar shows the relative strength of buying or selling pressure. Clusters of green bars suggest strong buying interest "
-                "and potential upward price movement, while clusters of red bars indicate selling pressure and potential downward movement. "
-                "This visualization helps identify periods of accumulation (green dominance) versus distribution (red dominance), "
-                "and can signal potential trend reversals or continuation patterns based on volume-price relationships."
+                "This chart displays daily trading volume with two bars per day: **green bars** represent buying volume "
+                "(when close price ≥ open price) and **red bars** represent selling volume (when close price < open price). "
+                "The height of each bar indicates the volume magnitude. This visualization helps identify periods of "
+                "accumulation (green dominance) versus distribution (red dominance), and can signal potential trend reversals "
+                "or continuation patterns based on volume-price relationships."
             )
             st.plotly_chart(create_volume_chart(df, ticker), use_container_width=True, key=f"volume_{ticker}")
             st.markdown("---")
@@ -701,6 +699,16 @@ def main():
             col1, col2 = st.columns([2, 1])
 
             with col1:
+                st.markdown("#### Funding Rate Chart")
+                st.caption(
+                    "This chart displays the **annualized funding rate** for perpetual futures contracts over time. "
+                    "**Green bars above the 0% line** indicate positive funding rates (longs pay shorts), suggesting bullish market sentiment "
+                    "and potential long positioning dominance. **Red bars below the 0% line** indicate negative funding rates (shorts pay longs), "
+                    "suggesting bearish sentiment and potential short positioning dominance. The funding rate is a mechanism that keeps perpetual "
+                    "futures prices aligned with the spot price. High positive funding rates (>50% annualized) may indicate crowded longs and "
+                    "correction risk, while extreme negative rates (<-50%) may signal crowded shorts and squeeze potential. "
+                    "The grey horizontal line at 0% represents the neutral point where no funding payments occur."
+                )
                 st.plotly_chart(create_funding_chart(funding_df, ticker), use_container_width=True, key=f"funding_{ticker}")
 
             with col2:
