@@ -1173,6 +1173,14 @@ def main():
                             if slug:
                                 full_event = get_event_by_slug(slug)
                                 if full_event:
+                                    # Filter out "hit" markets (cumulative markets)
+                                    event_title = full_event.get('title', '').lower()
+                                    event_slug = full_event.get('slug', '').lower()
+                                    
+                                    # Skip if title or slug contains "hit" pattern (cumulative markets)
+                                    if 'hit' in event_title or 'hit' in event_slug:
+                                        continue
+                                    
                                     future_events.append(full_event)
                     except Exception:
                         continue
@@ -1207,20 +1215,36 @@ def main():
                         continue
                     
                     rows = []
+                    seen_labels = {}  # Track best probability for each label
                     for market in markets:
                         label = market_target_label(market)
                         yes_p = extract_yes_probability(market)
                         
                         if yes_p is not None:
-                            rows.append({
-                                "Target": label,
-                                "Probability": yes_p,
-                                "SortKey": sort_key_from_label(label)
-                            })
+                            # For range markets, if same label appears multiple times,
+                            # keep the one with highest probability (or non-zero if available)
+                            if label in seen_labels:
+                                # Only update if this probability is more meaningful
+                                current_prob = seen_labels[label]
+                                if yes_p > current_prob or (current_prob == 0 and yes_p > 0):
+                                    seen_labels[label] = yes_p
+                            else:
+                                seen_labels[label] = yes_p
+                    
+                    # Convert to list of rows
+                    for label, prob in seen_labels.items():
+                        rows.append({
+                            "Target": label,
+                            "Probability": prob,
+                            "SortKey": sort_key_from_label(label)
+                        })
                     
                     if rows:
                         df = pd.DataFrame(rows)
                         df = df.sort_values(by="SortKey")
+                        
+                        # For cumulative markets (like "Will it hit $X?"), multiple values can be 100%
+                        # This is normal - it means the price has already exceeded those levels
                         
                         # Create bar plot
                         event_title = event.get('title', 'Unknown Event')
@@ -1233,6 +1257,12 @@ def main():
                                     st.caption(f"End Date: {end_date.strftime('%Y-%m-%d %H:%M UTC')}")
                                 except Exception:
                                     st.caption(f"End Date: {event_end}")
+                            
+                            # Add explanation for cumulative markets
+                            total_prob = df['Probability'].sum()
+                            max_prob_count = (df['Probability'] >= 0.99).sum()
+                            if max_prob_count > 1 and total_prob > 2:
+                                st.info("ℹ️ **Note:** This is a cumulative market. Multiple price targets can have high probabilities because each market asks 'Will the price hit $X?' independently. If the current price exceeds a target, that target shows ~100%.")
                             
                             fig = go.Figure()
                             
