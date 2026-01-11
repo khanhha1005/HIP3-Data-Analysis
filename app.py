@@ -27,7 +27,7 @@ from src.charts import (
     create_skew_pie,
     create_volume_chart,
 )
-from src.config import SYMBOLS, TICKERS
+from src.config import SYMBOLS
 from src.data_classes import DerivativesMetrics
 from src.derivatives import compute_derivatives_metrics
 from src.options import fetch_options_data
@@ -999,17 +999,14 @@ def main():
         st.markdown("### 🎯 Polymarket Predictions")
         st.caption("Market predictions and probability analysis from Polymarket (Future Events Only)")
         
-        # Extract unique tickers from ALL symbols in config (not just selected ones)
-        # Remove index tickers (MAG7, SEMIS) as they don't have individual stock predictions
-        all_tickers = [extract_ticker(s) for s in SYMBOLS]
-        unique_tickers = list(set(all_tickers))
-        # Filter out index tickers
-        index_tickers = {'MAG7', 'SEMIS'}
-        unique_tickers = [t for t in unique_tickers if t not in index_tickers]
+        # Extract unique tickers from selected symbols
+        unique_tickers = list(set([extract_ticker(s) for s in selected_symbols]))
         unique_tickers.sort()
         
-        st.info(f"🔍 Crawling predictions for {len(unique_tickers)} tickers: {', '.join(unique_tickers[:10])}{'...' if len(unique_tickers) > 10 else ''}")
-        st.markdown("---")
+        if not unique_tickers:
+            st.info("Please select symbols in the sidebar to view Polymarket predictions.")
+            st.markdown("---")
+            return
 
         # Helper functions from polymarket_price_predictions.py
         def safe_json_list(value):
