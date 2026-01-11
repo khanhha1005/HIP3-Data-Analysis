@@ -3,12 +3,19 @@ Voyager HIP-3 Equity Perps Dashboard
 Main entry point for Streamlit application
 """
 
+import json
 import math
+import re
 import time
 from datetime import datetime, timezone
 
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import requests
 import streamlit as st
+import yfinance as yf
+import numpy as np
 
 from src.api import discover_assets, fetch_candles, fetch_funding_history
 from src.charts import (
@@ -436,6 +443,21 @@ def main():
             st.caption("⏱️ 4 hours")
 
         st.markdown("---")
+        
+        # ETF Settings
+        st.markdown("### 📊 ETF Settings")
+        etf_period = st.selectbox("ETF Time Period", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"], index=3, key="etf_period")
+        
+        st.markdown("---")
+        
+        # Polymarket Settings
+        st.markdown("### 🎯 Polymarket Settings")
+        default_slug = "what-will-apple-aapl-close-at-in-2025"
+        polymarket_slug = st.text_input("Event Slug", value=default_slug, key="polymarket_slug")
+        st.caption("Enter the Polymarket event slug")
+        
+        st.markdown("---")
+        
         st.markdown(
             f"<small style='color: #71717a;'>Last sync: {datetime.now(timezone.utc).strftime('%H:%M:%S')} UTC</small>",
             unsafe_allow_html=True,
@@ -504,8 +526,8 @@ def main():
     status_text.empty()
 
     # Main content tabs
-    tab_overview, tab_technicals, tab_derivatives, tab_options = st.tabs(
-        ["📈 Market Snapshot", "📊 Technical Analysis", "🔥 Derivatives Intel", "📉 Options Analytics"]
+    tab_overview, tab_technicals, tab_derivatives, tab_options, tab_etf, tab_polymarket = st.tabs(
+        ["📈 Market Snapshot", "📊 Technical Analysis", "🔥 Derivatives Intel", "📉 Options Analytics", "📊 ETF Flow Analysis", "🎯 Polymarket Predictions"]
     )
 
     # =============================================================================
@@ -796,6 +818,295 @@ def main():
                     - **Balanced** → Neutral sentiment
                     """
                 )
+
+    # =============================================================================
+    # TAB 5: ETF FLOW ANALYSIS
+    # =============================================================================
+    with tab_etf:
+        st.markdown("### 📊 ETF Flow & Demand Dashboard")
+        st.caption("Analysis of **FNGS, XLG, QQQ, and MGK** to understand institutional demand drivers.")
+
+        etf_tickers = ['FNGS', 'XLG', 'QQQ', 'MGK']
+        issuer_map = {
+            'FNGS': 'MicroSectors (BMO)',
+            'XLG': 'Invesco (Top 50)',
+            'QQQ': 'Invesco (Nasdaq)',
+            'MGK': 'Vanguard (Mega Cap)'
+        }
+
+        @st.cache_data
+        def fetch_etf_data(tickers, period="1y"):
+            """Fetches ETF data from yfinance and calculates flow metrics."""
+            data = yf.download(tickers, period=period, group_by='ticker', auto_adjust=True)
+            processed_data = {}
+            summary_list = []
+
+            for ticker in tickers:
+                try:
+                    df = data[ticker].copy()
+                    if df.empty:
+                        continue
+                except KeyError:
+                    continue
+
+                # Calculate Flow Proxy
+                df['Price_Change'] = df['Close'].diff()
+                df['Direction'] = np.sign(df['Price_Change'])
+                df['Direction'] = df['Direction'].replace(0, method='ffill')
+                df['Daily_Flow_Est'] = df['Close'] * df['Volume'] * df['Direction']
+
+                # Calculate Weekly Flow
+                weekly_flow = df['Daily_Flow_Est'].resample('W').sum()
+                current_weekly_flow = weekly_flow.iloc[-1] if not weekly_flow.empty else 0
+
+                # Calculate Flow Streak
+                df['Flow_Sign'] = np.sign(df['Daily_Flow_Est'])
+                df['Flow_Sign'] = df['Flow_Sign'].replace(0, method='ffill').replace(0, method='bfill')
+                df['Flow_Sign'] = df['Flow_Sign'].replace(0, 1)
+                
+                if not df.empty and len(df) > 0:
+                    streak_values = []
+                    current_sign = None
+                    current_streak = 0
+                    
+                    for sign in df['Flow_Sign'].values:
+                        if pd.isna(sign):
+                            streak_values.append(0)
+                            current_streak = 0
+                            current_sign = None
+                            continue
+                        
+                        sign = int(sign)
+                        
+                        if current_sign is None or sign != current_sign:
+                            current_sign = sign
+                            current_streak = 1
+                        else:
+                            current_streak += 1
+                        
+                        streak_values.append(int(current_streak * sign))
+                    
+                    df['Streak'] = streak_values
+                    streak_val = int(df['Streak'].iloc[-1]) if not df.empty and len(df['Streak']) > 0 else 0
+                else:
+                    df['Streak'] = 0
+                    streak_val = 0
+
+                # Calculate Acceleration
+                df['Flow_MA20'] = df['Daily_Flow_Est'].rolling(window=20).mean()
+                if not df.empty and not pd.isna(df['Flow_MA20'].iloc[-1]):
+                    acceleration = df['Daily_Flow_Est'].iloc[-1] - df['Flow_MA20'].iloc[-1]
+                    acc_status = "SPEEDING UP" if acceleration > 0 else "SLOWING DOWN"
+                else:
+                    acc_status = "N/A"
+
+                df['Norm_Price'] = (df['Close'] / df['Close'].iloc[0]) * 100
+
+                processed_data[ticker] = df
+
+                summary_list.append({
+                    'Ticker': ticker,
+                    'Issuer': issuer_map.get(ticker, 'Unknown'),
+                    'Price': df['Close'].iloc[-1] if not df.empty else 0,
+                    'Daily Net Flow ($M)': round(df['Daily_Flow_Est'].iloc[-1] / 1_000_000, 2) if not df.empty else 0,
+                    'Weekly Net Flow ($M)': round(current_weekly_flow / 1_000_000, 2),
+                    'Streak (Days)': int(streak_val),
+                    'Acceleration': acc_status,
+                    'Total_Flow_Abs': df['Daily_Flow_Est'].abs().sum() if not df.empty else 0
+                })
+            
+            summary_df = pd.DataFrame(summary_list)
+            return processed_data, summary_df
+
+        # Fetch ETF data (etf_period is set in main sidebar)
+        with st.spinner('Fetching ETF data...'):
+            etf_processed_data, etf_summary_df = fetch_etf_data(etf_tickers, etf_period)
+
+        # Summary Metrics
+        st.markdown("#### 📝 Summary Metrics")
+        if not etf_summary_df.empty:
+            dominant_issuer = etf_summary_df.sort_values(by='Total_Flow_Abs', ascending=False).iloc[0]
+            st.markdown(f"🏆 **Dominant Issuer (Total Flow Volume):** {dominant_issuer['Issuer']} ({dominant_issuer['Ticker']})")
+            st.dataframe(etf_summary_df.drop(columns=['Total_Flow_Abs']).style.format({"Price": "${:.2f}"}), use_container_width=True)
+
+        st.markdown("---")
+
+        # Detailed 20-Day Table
+        st.markdown("#### 📊 Detailed 20-Day Flow Analysis")
+        st.markdown("""
+        **Streak Definition:** Counts consecutive days with money flow in the same direction (Buy or Sell).
+        - **Positive numbers (e.g., +5, +10):** Consecutive days of buying (institutional accumulation)
+        - **Negative numbers (e.g., -3, -7):** Consecutive days of selling (institutional distribution)
+        - **Small numbers (e.g., +1, -1, +2):** Market is sideways, no clear trend
+        """)
+
+        for ticker in etf_tickers:
+            if ticker not in etf_processed_data:
+                continue
+            
+            df = etf_processed_data[ticker]
+            if df.empty:
+                continue
+            
+            with st.expander(f"📈 {ticker} - Last 20 Days", expanded=False):
+                df_last_20 = df.tail(20).copy()
+                
+                detail_table = pd.DataFrame({
+                    'Date': df_last_20.index.strftime('%Y-%m-%d'),
+                    'Price': df_last_20['Close'].round(2),
+                    'Volume': df_last_20['Volume'].apply(lambda x: f"{x:,.0f}"),
+                    'Daily Flow ($M)': (df_last_20['Daily_Flow_Est'] / 1_000_000).round(2),
+                    'Streak (Days)': df_last_20['Streak'].astype(int),
+                })
+                
+                styled_table = detail_table.style.format({
+                    'Price': '${:.2f}',
+                    'Daily Flow ($M)': '${:.2f}M',
+                })
+                
+                st.dataframe(styled_table, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+
+        # Performance & Flow Plots
+        st.markdown("#### 📈 Performance & Flow Analysis")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**Relative Performance (Rebased to 100)**")
+            fig_perf = go.Figure()
+            for ticker in etf_tickers:
+                if ticker in etf_processed_data:
+                    df = etf_processed_data[ticker]
+                    fig_perf.add_trace(go.Scatter(x=df.index, y=df['Norm_Price'], mode='lines', name=ticker))
+            fig_perf.update_layout(yaxis_title="Growth (%)", hovermode="x unified", template="plotly_white")
+            st.plotly_chart(fig_perf, use_container_width=True)
+
+        with col2:
+            st.markdown("**Estimated Institutional Money Flow (Daily)**")
+            fig_flow = go.Figure()
+            for ticker in etf_tickers:
+                if ticker in etf_processed_data:
+                    df = etf_processed_data[ticker]
+                    fig_flow.add_trace(go.Scatter(x=df.index, y=df['Daily_Flow_Est'] / 1_000_000, mode='lines', name=ticker))
+            fig_flow.add_hline(y=0, line_dash="dash", line_color="black")
+            fig_flow.update_layout(yaxis_title="Estimated Flow ($ Millions)", hovermode="x unified", template="plotly_white")
+            st.plotly_chart(fig_flow, use_container_width=True)
+
+    # =============================================================================
+    # TAB 6: POLYMARKET PREDICTIONS
+    # =============================================================================
+    with tab_polymarket:
+        st.markdown("### 🎯 Polymarket Predictions")
+        st.caption("Market predictions and probability analysis from Polymarket")
+
+        @st.cache_data(ttl=3600)  # Cache for 1 hour
+        def fetch_polymarket_data(slug):
+            """Fetches data from Polymarket API."""
+            url = "https://gamma-api.polymarket.com/events"
+            params = {"slug": slug}
+            
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json"
+            }
+
+            try:
+                response = requests.get(url, params=params, headers=headers, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                return data[0] if data else None
+            except Exception as e:
+                st.error(f"Error fetching Polymarket data: {str(e)}")
+                return None
+
+        # polymarket_slug is set in main sidebar
+        if polymarket_slug:
+            with st.spinner('Fetching Polymarket data...'):
+                event = fetch_polymarket_data(polymarket_slug)
+
+            if event:
+                st.markdown(f"#### {event.get('title', 'Market Prediction')}")
+                
+                markets = event.get('markets', [])
+                rows = []
+
+                for market in markets:
+                    title = market.get('groupItemTitle', market.get('question', 'Unknown'))
+                    
+                    outcome_prices = market.get('outcomePrices', [0, 0])
+                    
+                    if isinstance(outcome_prices, str):
+                        try:
+                            outcome_prices = json.loads(outcome_prices.replace("'", '"'))
+                        except json.JSONDecodeError:
+                            outcome_prices = [0, 0]
+                    
+                    try:
+                        yes_price = float(outcome_prices[0])
+                    except (IndexError, ValueError):
+                        yes_price = 0.0
+
+                    numbers = re.findall(r'\d+', title)
+                    sort_val = float(numbers[0]) if numbers else 0
+
+                    if "<" in title:
+                        sort_val -= 0.1
+                    elif ">" in title:
+                        sort_val += 0.1
+
+                    rows.append({
+                        "Target": title,
+                        "Probability": yes_price,
+                        "SortKey": sort_val
+                    })
+
+                if rows:
+                    df = pd.DataFrame(rows)
+                    df = df.sort_values(by="SortKey")
+
+                    # Display table
+                    st.markdown("#### Current Market Probabilities")
+                    display_df = df[['Target', 'Probability']].copy()
+                    display_df['Probability'] = display_df['Probability'].apply(lambda x: f"{x:.1%}")
+                    display_df.columns = ['Price Target', 'Probability']
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+                    st.markdown("---")
+
+                    # Visualization
+                    st.markdown("#### Probability Distribution")
+                    fig = go.Figure()
+                    
+                    colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
+                    
+                    fig.add_trace(go.Bar(
+                        x=df['Target'],
+                        y=df['Probability'],
+                        marker_color=colors,
+                        text=[f"{p:.1%}" for p in df['Probability']],
+                        textposition='outside',
+                        name='Probability'
+                    ))
+                    
+                    fig.update_layout(
+                        title=f"Market Prediction: {event.get('title', 'Probability Distribution')}",
+                        xaxis_title="Price Target (USD)",
+                        yaxis_title="Probability",
+                        yaxis_tickformat='.0%',
+                        template="plotly_white",
+                        hovermode="x unified",
+                        height=500
+                    )
+                    fig.update_xaxes(tickangle=45)
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("No market data found for this event.")
+            else:
+                st.error("Could not fetch data for the specified event. Please check the slug and try again.")
+        else:
+            st.info("Please enter a Polymarket event slug in the sidebar to view predictions.")
 
     # Footer
     st.markdown("---")
