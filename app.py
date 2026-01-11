@@ -1173,12 +1173,17 @@ def main():
                             if slug:
                                 full_event = get_event_by_slug(slug)
                                 if full_event:
-                                    # Filter out "hit" markets (cumulative markets)
+                                    # Filter out unwanted events
                                     event_title = full_event.get('title', '').lower()
                                     event_slug = full_event.get('slug', '').lower()
                                     
                                     # Skip if title or slug contains "hit" pattern (cumulative markets)
                                     if 'hit' in event_title or 'hit' in event_slug:
+                                        continue
+                                    
+                                    # Skip non-stock related events (e.g., Sanremo, music festivals, etc.)
+                                    unwanted_keywords = ['sanremo', 'winner', 'festival', 'music', 'election', 'sport']
+                                    if any(keyword in event_title or keyword in event_slug for keyword in unwanted_keywords):
                                         continue
                                     
                                     future_events.append(full_event)
