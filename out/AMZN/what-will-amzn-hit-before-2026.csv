@@ -1,0 +1,14 @@
+ticker,event_id,event_slug,event_title,event_endDate,event_startDate,market_id,market_slug,target,prob_yes,sort_key,volume,liquidity,lastTradePrice,bestBid,bestAsk
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694442,will-amzn-hit-150-before-2026-762,↓ $150,0.0,150.0,5954.790376,,1.0,,0.001
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694441,will-amzn-hit-170-before-2026-943,↓ $170,0.0,170.0,9428.9088,,1.0,,0.002
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694440,will-amzn-hit-190-before-2026-263,↓ $190,0.0,190.0,9305.405426,,1.0,,0.001
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694439,will-amzn-hit-195-before-2026-687,↓ $195,0.0,195.0,69984.344817,,1.0,,0.003
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694438,will-amzn-hit-205-before-2026-738,↓ $205,0.0,205.0,6354.732875,,1.0,,0.003
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694437,will-amzn-hit-210-before-2026-582,↓ $210,0.0,210.0,4115.5981,,1.0,,0.001
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694435,will-amzn-hit-220-before-2026,↑ $220,1.0,220.0,1776.0,0,0.999,0.999,1.0
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694434,will-amzn-hit-225-before-2026,↑ $225,1.0,225.0,8916.4108,,1.0,0.999,1.0
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694433,will-amzn-hit-235-before-2026,↑ $235,1.0,235.0,4812.136566,,1.0,0.999,1.0
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694432,will-amzn-hit-245-before-2026,↑ $245,0.0,245.0,10774.588611,,1.0,,0.001
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694431,will-amzn-hit-260-before-2026,↑ $260,0.0,260.0,9420.005489,,1.0,,0.001
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694430,will-amzn-hit-275-before-2026,↑ $275,0.0,275.0,16963.446288,,1.0,,0.001
+AMZN,86625,what-will-amzn-hit-before-2026,What will Amazon (AMZN) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.333769Z,694429,will-amzn-hit-300-before-2026,↑ $300,0.0,300.0,12376.661237,,1.0,,0.002

@@ -450,11 +450,10 @@ def main():
         
         st.markdown("---")
         
-        # Polymarket Settings
-        st.markdown("### 🎯 Polymarket Settings")
-        default_slug = "what-will-apple-aapl-close-at-in-2025"
-        polymarket_slug = st.text_input("Event Slug", value=default_slug, key="polymarket_slug")
-        st.caption("Enter the Polymarket event slug")
+        # Polymarket Search Settings
+        st.markdown("### 🎯 Polymarket Search")
+        polymarket_ticker = st.text_input("Ticker Symbol (e.g., AAPL, TSLA)", value="AAPL", key="polymarket_ticker")
+        polymarket_year = st.number_input("Year", min_value=2024, max_value=2030, value=2026, key="polymarket_year")
         
         st.markdown("---")
         
@@ -998,115 +997,238 @@ def main():
     # =============================================================================
     with tab_polymarket:
         st.markdown("### 🎯 Polymarket Predictions")
-        st.caption("Market predictions and probability analysis from Polymarket")
+        st.caption("Market predictions and probability analysis from Polymarket (Future Events Only)")
 
-        @st.cache_data(ttl=3600)  # Cache for 1 hour
-        def fetch_polymarket_data(slug):
-            """Fetches data from Polymarket API."""
-            url = "https://gamma-api.polymarket.com/events"
-            params = {"slug": slug}
+        # Helper functions from polymarket_price_predictions.py
+        def safe_json_list(value):
+            """Safely parse JSON list from various formats."""
+            if value is None:
+                return []
+            if isinstance(value, list):
+                return value
+            if isinstance(value, str):
+                s = value.strip()
+                if not s:
+                    return []
+                try:
+                    return json.loads(s)
+                except Exception:
+                    try:
+                        return json.loads(s.replace("'", '"'))
+                    except Exception:
+                        return []
+            return []
+
+        def extract_yes_probability(market):
+            """Extract YES probability from market data."""
+            outcomes = safe_json_list(market.get("outcomes"))
+            prices = safe_json_list(market.get("outcomePrices"))
             
+            fprices = []
+            for p in prices:
+                try:
+                    fprices.append(float(p))
+                except Exception:
+                    fprices.append(float("nan"))
+            
+            if outcomes and fprices and len(outcomes) == len(fprices):
+                for i, o in enumerate(outcomes):
+                    if isinstance(o, str) and o.strip().lower() == "yes":
+                        return fprices[i] if pd.notna(fprices[i]) else None
+            
+            if fprices:
+                return fprices[0] if pd.notna(fprices[0]) else None
+            return None
+
+        def market_target_label(market):
+            """Get market target label."""
+            return (
+                market.get("groupItemTitle")
+                or market.get("question")
+                or market.get("slug")
+                or "Unknown"
+            )
+
+        def sort_key_from_label(label):
+            """Create sort key from label."""
+            nums = re.findall(r"\d+(?:\.\d+)?", label.replace(",", ""))
+            key = float(nums[0]) if nums else 0.0
+            if "<" in label:
+                key -= 0.1
+            elif ">" in label:
+                key += 0.1
+            return key
+
+        @st.cache_data(ttl=3600)
+        def search_polymarket_events(query, max_pages=3):
+            """Search for Polymarket events."""
+            base_url = "https://gamma-api.polymarket.com"
             headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept": "application/json"
             }
+            
+            seen = {}
+            for page in range(1, max_pages + 1):
+                try:
+                    url = f"{base_url}/public-search"
+                    params = {
+                        "q": query,
+                        "page": page,
+                        "limit_per_type": 50,
+                        "keep_closed_markets": 1,
+                        "events_status": "all",
+                    }
+                    response = requests.get(url, params=params, headers=headers, timeout=10)
+                    response.raise_for_status()
+                    payload = response.json()
+                    
+                    events = payload.get("events") or []
+                    for ev in events:
+                        slug = ev.get("slug")
+                        if slug:
+                            seen[slug] = ev
+                    
+                    pagination = payload.get("pagination") or {}
+                    if not pagination.get("hasMore"):
+                        break
+                    
+                    time.sleep(0.15)
+                except Exception as e:
+                    break
+            
+            return list(seen.values())
 
+        @st.cache_data(ttl=3600)
+        def get_event_by_slug(slug):
+            """Get full event data by slug."""
+            base_url = "https://gamma-api.polymarket.com"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json"
+            }
             try:
-                response = requests.get(url, params=params, headers=headers, timeout=10)
+                url = f"{base_url}/events/slug/{slug}"
+                response = requests.get(url, headers=headers, timeout=10)
                 response.raise_for_status()
-                data = response.json()
-                return data[0] if data else None
-            except Exception as e:
-                st.error(f"Error fetching Polymarket data: {str(e)}")
+                return response.json()
+            except Exception:
                 return None
 
-        # polymarket_slug is set in main sidebar
-        if polymarket_slug:
-            with st.spinner('Fetching Polymarket data...'):
-                event = fetch_polymarket_data(polymarket_slug)
-
-            if event:
-                st.markdown(f"#### {event.get('title', 'Market Prediction')}")
+        # Use settings from main sidebar (polymarket_ticker and polymarket_year)
+        # Auto-search when tab is accessed
+        if polymarket_ticker:
+            st.session_state['polymarket_auto_search'] = True
+            
+            with st.spinner(f'Searching for {polymarket_ticker} events in {polymarket_year}...'):
+                queries = [
+                    f"{polymarket_ticker} {polymarket_year}",
+                    f"{polymarket_ticker} close {polymarket_year}",
+                    f"{polymarket_ticker} closes {polymarket_year}",
+                    f"{polymarket_ticker} hit {polymarket_year}",
+                ]
                 
-                markets = event.get('markets', [])
-                rows = []
+                all_events = []
+                for query in queries:
+                    events = search_polymarket_events(query, max_pages=2)
+                    all_events.extend(events)
+                
+                # Dedupe by slug
+                seen_slugs = set()
+                unique_events = []
+                for ev in all_events:
+                    slug = ev.get("slug")
+                    if slug and slug not in seen_slugs:
+                        seen_slugs.add(slug)
+                        unique_events.append(ev)
 
-                for market in markets:
-                    title = market.get('groupItemTitle', market.get('question', 'Unknown'))
-                    
-                    outcome_prices = market.get('outcomePrices', [0, 0])
-                    
-                    if isinstance(outcome_prices, str):
-                        try:
-                            outcome_prices = json.loads(outcome_prices.replace("'", '"'))
-                        except json.JSONDecodeError:
-                            outcome_prices = [0, 0]
-                    
+            # Filter events where endDate > today
+            today = datetime.now(timezone.utc)
+            future_events = []
+            
+            for ev_stub in unique_events:
+                end_date_str = ev_stub.get("endDate")
+                if end_date_str:
                     try:
-                        yes_price = float(outcome_prices[0])
-                    except (IndexError, ValueError):
-                        yes_price = 0.0
+                        end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
+                        if end_date > today:
+                            # Fetch full event data
+                            slug = ev_stub.get("slug")
+                            if slug:
+                                full_event = get_event_by_slug(slug)
+                                if full_event:
+                                    future_events.append(full_event)
+                    except Exception:
+                        continue
 
-                    numbers = re.findall(r'\d+', title)
-                    sort_val = float(numbers[0]) if numbers else 0
-
-                    if "<" in title:
-                        sort_val -= 0.1
-                    elif ">" in title:
-                        sort_val += 0.1
-
-                    rows.append({
-                        "Target": title,
-                        "Probability": yes_price,
-                        "SortKey": sort_val
-                    })
-
-                if rows:
-                    df = pd.DataFrame(rows)
-                    df = df.sort_values(by="SortKey")
-
-                    # Display table
-                    st.markdown("#### Current Market Probabilities")
-                    display_df = df[['Target', 'Probability']].copy()
-                    display_df['Probability'] = display_df['Probability'].apply(lambda x: f"{x:.1%}")
-                    display_df.columns = ['Price Target', 'Probability']
-                    st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-                    st.markdown("---")
-
-                    # Visualization
-                    st.markdown("#### Probability Distribution")
-                    fig = go.Figure()
-                    
-                    colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
-                    
-                    fig.add_trace(go.Bar(
-                        x=df['Target'],
-                        y=df['Probability'],
-                        marker_color=colors,
-                        text=[f"{p:.1%}" for p in df['Probability']],
-                        textposition='outside',
-                        name='Probability'
-                    ))
-                    
-                    fig.update_layout(
-                        title=f"Market Prediction: {event.get('title', 'Probability Distribution')}",
-                        xaxis_title="Price Target (USD)",
-                        yaxis_title="Probability",
-                        yaxis_tickformat='.0%',
-                        template="plotly_white",
-                        hovermode="x unified",
-                        height=500
-                    )
-                    fig.update_xaxes(tickangle=45)
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("No market data found for this event.")
+            if not future_events:
+                st.info(f"No future events found for {polymarket_ticker} in {polymarket_year}. Try a different ticker or year.")
             else:
-                st.error("Could not fetch data for the specified event. Please check the slug and try again.")
+                st.success(f"Found {len(future_events)} future event(s) for {polymarket_ticker}")
+                st.markdown("---")
+
+                # Display bar plots for each event
+                for event in future_events:
+                    markets = event.get('markets', [])
+                    if not markets:
+                        continue
+                    
+                    rows = []
+                    for market in markets:
+                        label = market_target_label(market)
+                        yes_p = extract_yes_probability(market)
+                        
+                        if yes_p is not None:
+                            rows.append({
+                                "Target": label,
+                                "Probability": yes_p,
+                                "SortKey": sort_key_from_label(label)
+                            })
+                    
+                    if rows:
+                        df = pd.DataFrame(rows)
+                        df = df.sort_values(by="SortKey")
+                        
+                        # Create bar plot
+                        event_title = event.get('title', 'Unknown Event')
+                        event_end = event.get('endDate', '')
+                        
+                        st.markdown(f"#### {event_title}")
+                        if event_end:
+                            try:
+                                end_date = datetime.fromisoformat(event_end.replace("Z", "+00:00"))
+                                st.caption(f"End Date: {end_date.strftime('%Y-%m-%d %H:%M UTC')}")
+                            except Exception:
+                                st.caption(f"End Date: {event_end}")
+                        
+                        fig = go.Figure()
+                        
+                        colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
+                        
+                        fig.add_trace(go.Bar(
+                            x=df['Target'],
+                            y=df['Probability'],
+                            marker_color=colors,
+                            text=[f"{p:.1%}" for p in df['Probability']],
+                            textposition='outside',
+                            name='Probability'
+                        ))
+                        
+                        fig.update_layout(
+                            title=f"{polymarket_ticker} Price Prediction",
+                            xaxis_title="Price Target (USD)",
+                            yaxis_title="Probability",
+                            yaxis_tickformat='.0%',
+                            template="plotly_white",
+                            hovermode="x unified",
+                            height=500
+                        )
+                        fig.update_xaxes(tickangle=45)
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        st.markdown("---")
         else:
-            st.info("Please enter a Polymarket event slug in the sidebar to view predictions.")
+            st.info("👆 Configure ticker symbol and year in the sidebar to view future Polymarket predictions. Only events with endDate > today are shown.")
 
     # Footer
     st.markdown("---")

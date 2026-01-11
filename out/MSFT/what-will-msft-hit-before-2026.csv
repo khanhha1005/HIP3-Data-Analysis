@@ -1,0 +1,14 @@
+ticker,event_id,event_slug,event_title,event_endDate,event_startDate,market_id,market_slug,target,prob_yes,sort_key,volume,liquidity,lastTradePrice,bestBid,bestAsk
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694386,will-msft-hit-335-before-2026-593,↓ $335,0.0,335.0,10522.840017,,1,,0.001
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694385,will-msft-hit-380-before-2026-124,↓ $380,0.0,380.0,5110.78983,,1,,0.003
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694384,will-msft-hit-420-before-2026-979,↓ $420,0.0,420.0,4495.643999,,1,,0.003
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694383,will-msft-hit-430-before-2026-378,↓ $430,0.0,430.0,7362.979129,,1,,0.001
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694382,will-msft-hit-455-before-2026-841,↓ $455,0.0,455.0,10757.798959,,1,,0.008
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694381,will-msft-hit-465-before-2026-556,↓ $465,1.0,465.0,6124.58,,1,0.998,0.999
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694379,will-msft-hit-485-before-2026,↑ $485,1.0,485.0,12931.7105,,1,0.999,1.0
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694378,will-msft-hit-500-before-2026,↑ $500,0.0,500.0,12638.732822,,1,,0.008
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694377,will-msft-hit-525-before-2026,↑ $525,0.0,525.0,16183.787893,,1,,0.001
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694376,will-msft-hit-555-before-2026,↑ $555,0.0,555.0,5700.792912,,1,,0.001
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694375,will-msft-hit-575-before-2026,↑ $575,0.0,575.0,4176.245237,,1,,0.001
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694374,will-msft-hit-600-before-2026,↑ $600,0.0,600.0,4959.147763,,1,,0.001
+MSFT,86621,what-will-msft-hit-before-2026,What will Microsoft (MSFT) hit before 2026?,2025-12-31T23:59:59Z,2025-11-21T16:08:39.563141Z,694373,will-msft-hit-635-before-2026,↑ $635,0.0,635.0,5146.234922,,1,,0.001
