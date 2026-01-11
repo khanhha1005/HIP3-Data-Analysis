@@ -450,10 +450,10 @@ def main():
         
         st.markdown("---")
         
-        # Polymarket Search Settings
-        st.markdown("### 🎯 Polymarket Search")
-        polymarket_ticker = st.text_input("Ticker Symbol (e.g., AAPL, TSLA)", value="AAPL", key="polymarket_ticker")
+        # Polymarket Settings
+        st.markdown("### 🎯 Polymarket Settings")
         polymarket_year = st.number_input("Year", min_value=2024, max_value=2030, value=2026, key="polymarket_year")
+        st.caption("Predictions will be fetched for all selected symbols above")
         
         st.markdown("---")
         
@@ -998,6 +998,15 @@ def main():
     with tab_polymarket:
         st.markdown("### 🎯 Polymarket Predictions")
         st.caption("Market predictions and probability analysis from Polymarket (Future Events Only)")
+        
+        # Extract unique tickers from selected symbols
+        unique_tickers = list(set([extract_ticker(s) for s in selected_symbols]))
+        unique_tickers.sort()
+        
+        if not unique_tickers:
+            st.info("Please select symbols in the sidebar to view Polymarket predictions.")
+            st.markdown("---")
+            return
 
         # Helper functions from polymarket_price_predictions.py
         def safe_json_list(value):
@@ -1115,37 +1124,44 @@ def main():
             except Exception:
                 return None
 
-        # Use settings from main sidebar (polymarket_ticker and polymarket_year)
-        # Auto-search when tab is accessed
-        if polymarket_ticker:
-            st.session_state['polymarket_auto_search'] = True
+        # Search for predictions for all selected tickers
+        today = datetime.now(timezone.utc)
+        all_future_events = {}  # {ticker: [events]}
+        
+        progress_text = st.empty()
+        progress_bar = st.progress(0)
+        
+        total_tickers = len(unique_tickers)
+        for idx, ticker in enumerate(unique_tickers):
+            progress = (idx + 1) / total_tickers
+            progress_bar.progress(progress)
+            progress_text.text(f"🔍 Searching {ticker}... ({idx + 1}/{total_tickers})")
             
-            with st.spinner(f'Searching for {polymarket_ticker} events in {polymarket_year}...'):
-                queries = [
-                    f"{polymarket_ticker} {polymarket_year}",
-                    f"{polymarket_ticker} close {polymarket_year}",
-                    f"{polymarket_ticker} closes {polymarket_year}",
-                    f"{polymarket_ticker} hit {polymarket_year}",
-                ]
-                
-                all_events = []
-                for query in queries:
-                    events = search_polymarket_events(query, max_pages=2)
-                    all_events.extend(events)
-                
-                # Dedupe by slug
-                seen_slugs = set()
-                unique_events = []
-                for ev in all_events:
-                    slug = ev.get("slug")
-                    if slug and slug not in seen_slugs:
-                        seen_slugs.add(slug)
-                        unique_events.append(ev)
-
+            # Build search queries for this ticker
+            queries = [
+                f"{ticker} {polymarket_year}",
+                f"{ticker} close {polymarket_year}",
+                f"{ticker} closes {polymarket_year}",
+                f"{ticker} hit {polymarket_year}",
+            ]
+            
+            # Search for events
+            all_events = []
+            for query in queries:
+                events = search_polymarket_events(query, max_pages=2)
+                all_events.extend(events)
+            
+            # Dedupe by slug
+            seen_slugs = set()
+            unique_events = []
+            for ev in all_events:
+                slug = ev.get("slug")
+                if slug and slug not in seen_slugs:
+                    seen_slugs.add(slug)
+                    unique_events.append(ev)
+            
             # Filter events where endDate > today
-            today = datetime.now(timezone.utc)
             future_events = []
-            
             for ev_stub in unique_events:
                 end_date_str = ev_stub.get("endDate")
                 if end_date_str:
@@ -1160,15 +1176,32 @@ def main():
                                     future_events.append(full_event)
                     except Exception:
                         continue
-
-            if not future_events:
-                st.info(f"No future events found for {polymarket_ticker} in {polymarket_year}. Try a different ticker or year.")
-            else:
-                st.success(f"Found {len(future_events)} future event(s) for {polymarket_ticker}")
-                st.markdown("---")
-
-                # Display bar plots for each event
-                for event in future_events:
+            
+            if future_events:
+                all_future_events[ticker] = future_events
+            
+            time.sleep(0.2)  # Small delay to avoid rate limiting
+        
+        progress_bar.empty()
+        progress_text.empty()
+        
+        # Display results
+        total_events = sum(len(events) for events in all_future_events.values())
+        if total_events == 0:
+            st.info(f"No future events found for {', '.join(unique_tickers)} in {polymarket_year}. Try a different year.")
+        else:
+            st.success(f"Found {total_events} future event(s) across {len(all_future_events)} ticker(s)")
+            st.markdown("---")
+            
+            # Display bar plots grouped by ticker
+            for ticker in unique_tickers:
+                if ticker not in all_future_events:
+                    continue
+                
+                events = all_future_events[ticker]
+                st.markdown(f"### 📊 {ticker} Predictions")
+                
+                for event in events:
                     markets = event.get('markets', [])
                     if not markets:
                         continue
@@ -1193,42 +1226,41 @@ def main():
                         event_title = event.get('title', 'Unknown Event')
                         event_end = event.get('endDate', '')
                         
-                        st.markdown(f"#### {event_title}")
-                        if event_end:
-                            try:
-                                end_date = datetime.fromisoformat(event_end.replace("Z", "+00:00"))
-                                st.caption(f"End Date: {end_date.strftime('%Y-%m-%d %H:%M UTC')}")
-                            except Exception:
-                                st.caption(f"End Date: {event_end}")
-                        
-                        fig = go.Figure()
-                        
-                        colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
-                        
-                        fig.add_trace(go.Bar(
-                            x=df['Target'],
-                            y=df['Probability'],
-                            marker_color=colors,
-                            text=[f"{p:.1%}" for p in df['Probability']],
-                            textposition='outside',
-                            name='Probability'
-                        ))
-                        
-                        fig.update_layout(
-                            title=f"{polymarket_ticker} Price Prediction",
-                            xaxis_title="Price Target (USD)",
-                            yaxis_title="Probability",
-                            yaxis_tickformat='.0%',
-                            template="plotly_white",
-                            hovermode="x unified",
-                            height=500
-                        )
-                        fig.update_xaxes(tickangle=45)
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        st.markdown("---")
-        else:
-            st.info("👆 Configure ticker symbol and year in the sidebar to view future Polymarket predictions. Only events with endDate > today are shown.")
+                        with st.expander(f"📈 {event_title}", expanded=True):
+                            if event_end:
+                                try:
+                                    end_date = datetime.fromisoformat(event_end.replace("Z", "+00:00"))
+                                    st.caption(f"End Date: {end_date.strftime('%Y-%m-%d %H:%M UTC')}")
+                                except Exception:
+                                    st.caption(f"End Date: {event_end}")
+                            
+                            fig = go.Figure()
+                            
+                            colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
+                            
+                            fig.add_trace(go.Bar(
+                                x=df['Target'],
+                                y=df['Probability'],
+                                marker_color=colors,
+                                text=[f"{p:.1%}" for p in df['Probability']],
+                                textposition='outside',
+                                name='Probability'
+                            ))
+                            
+                            fig.update_layout(
+                                title=f"{ticker} Price Prediction",
+                                xaxis_title="Price Target (USD)",
+                                yaxis_title="Probability",
+                                yaxis_tickformat='.0%',
+                                template="plotly_white",
+                                hovermode="x unified",
+                                height=500
+                            )
+                            fig.update_xaxes(tickangle=45)
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
 
     # Footer
     st.markdown("---")
