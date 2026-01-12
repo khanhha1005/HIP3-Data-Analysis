@@ -450,25 +450,6 @@ def main():
 
         st.markdown("---")
         
-        # Macro Event Settings
-        st.markdown("### 🌍 Market Index")
-        macro_period = st.selectbox(
-            "Macro Period",
-            ["1mo", "3mo", "6mo", "1y", "2y"],
-            index=2,
-            key="macro_period",
-            help="Select the historical period for macro data"
-        )
-        macro_interval = st.selectbox(
-            "Macro Interval",
-            ["1d", "1h"],
-            index=0,
-            key="macro_interval",
-            help="Select the data interval"
-        )
-        
-        st.markdown("---")
-        
         st.markdown(
             f"<small style='color: #71717a;'>Last sync: {datetime.now(timezone.utc).strftime('%H:%M:%S')} UTC</small>",
             unsafe_allow_html=True,
@@ -1333,7 +1314,8 @@ def main():
                 return pd.DataFrame(), pd.DataFrame()
         
         with st.spinner('🔄 Fetching macro data...'):
-            macro_prices, macro_snapshot = fetch_macro_data(macro_period, macro_interval)
+            # Use default values: 6mo period, 1d interval
+            macro_prices, macro_snapshot = fetch_macro_data("6mo", "1d")
         
         if macro_prices.empty:
             st.warning("⚠️ Unable to fetch macro data. Please try again later.")
@@ -1458,16 +1440,21 @@ def main():
             
             # Fetch macro event data
             @st.cache_data(ttl=3600)  # Cache for 1 hour
-            def fetch_macro_event_data(start_date: str = "2018-01-01"):
+            def fetch_macro_event_data(start_date: str = "2018-01-01", end_date: str = None):
                 """Fetch macro event data from FRED."""
                 try:
                     from fredapi import Fred
+                    
+                    # Use today's date if end_date not provided
+                    if end_date is None:
+                        end_date = datetime.now().strftime("%Y-%m-%d")
+                    
                     fred = Fred(api_key=FRED_API_KEY)
                     
                     data_dict = {}
                     for name, s_id in MACRO_EVENT_SERIES.items():
-                        # Fetch data
-                        series = fred.get_series(s_id)
+                        # Fetch data with explicit start and end dates to ensure latest data
+                        series = fred.get_series(s_id, start=start_date, end=end_date)
                         
                         # Calculate YoY % change for inflation metrics (except for Fed Rate)
                         if s_id != 'FEDFUNDS':
@@ -1582,23 +1569,6 @@ def main():
         st.markdown("### 📊 Treasury Yields Dashboard")
         st.caption("US Treasury yield curve analysis: 3M, 2Y, 5Y, 10Y yields and 10Y-2Y spread with inversion tracking")
         
-        # Treasury settings in sidebar
-        with st.sidebar:
-            st.markdown("---")
-            st.markdown("### 📊 Treasury Settings")
-            treasury_start = st.date_input(
-                "Start Date",
-                value=pd.Timestamp("2015-01-01").date(),
-                key="treasury_start",
-                help="Select the start date for treasury yield data"
-            )
-            treasury_weekly = st.checkbox(
-                "Weekly Resample",
-                value=False,
-                key="treasury_weekly",
-                help="Resample data to weekly (Friday) for smoother plots"
-            )
-        
         # Fetch treasury data
         @st.cache_data(ttl=3600)  # Cache for 1 hour
         def fetch_treasury_data(start_date: str, weekly: bool = False):
@@ -1621,7 +1591,8 @@ def main():
                 return pd.DataFrame()
         
         with st.spinner('🔄 Fetching treasury yield data...'):
-            treasury_df = fetch_treasury_data(str(treasury_start), treasury_weekly)
+            # Use default values: start date 2015-01-01, no weekly resample
+            treasury_df = fetch_treasury_data("2015-01-01", False)
         
         if treasury_df.empty:
             st.warning("⚠️ Unable to fetch treasury yield data. Please try again later.")
