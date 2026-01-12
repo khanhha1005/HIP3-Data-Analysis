@@ -13,14 +13,13 @@ Data source (FRED series):
   10Y -> DGS10
 
 Install:
-  pip install pandas matplotlib pandas_datareader
+  pip install pandas matplotlib requests
 """
 
 import argparse
 from datetime import date
 import pandas as pd
 import matplotlib.pyplot as plt
-from pandas_datareader import data as pdr
 
 
 SERIES = {
@@ -32,16 +31,34 @@ SERIES = {
 
 
 def fetch_treasury_yields(start: str, end: str) -> pd.DataFrame:
-    fred_codes = list(SERIES.values())
-    df = pdr.DataReader(fred_codes, "fred", start, end)
-
-    # Rename columns to nicer labels (3M/2Y/5Y/10Y)
-    reverse_map = {v: k for k, v in SERIES.items()}
-    df = df.rename(columns=reverse_map)
-
+    """
+    Fetch US Treasury yields from FRED using direct CSV API.
+    """
+    dfs = []
+    
+    for label, fred_code in SERIES.items():
+        # FRED CSV API endpoint
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={fred_code}&cosd={start}&coed={end}"
+        
+        try:
+            # Read CSV directly from FRED
+            series_df = pd.read_csv(url, skiprows=1, names=['DATE', label], parse_dates=['DATE'], index_col='DATE')
+            # FRED uses '.' for missing values, convert to NaN
+            series_df[label] = pd.to_numeric(series_df[label], errors='coerce')
+            dfs.append(series_df)
+        except Exception as e:
+            print(f"Warning: Failed to fetch {fred_code} ({label}): {e}")
+            continue
+    
+    if not dfs:
+        raise ValueError("Failed to fetch any treasury yield data from FRED")
+    
+    # Combine all series
+    df = pd.concat(dfs, axis=1)
+    
     # FRED yields can have missing values on holidays/weekends; forward-fill
     df = df.sort_index().ffill()
-
+    
     # Keep only rows where we have at least one yield
     df = df.dropna(how="all")
     return df
