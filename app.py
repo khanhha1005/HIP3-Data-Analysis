@@ -570,7 +570,7 @@ def main():
             with col3:
                 st.metric("📉 24h Low", format_currency(tech.get("low_24h", float("nan"))))
             with col4:
-                st.metric("📊 Volume", f"{tech.get('volume_24h', 0):,.0f}")
+                st.metric("📊 Volume", f"{tech.get('volume_24h', 0):,.0f} Tokens")
             with col5:
                 vol = tech.get("vol_24h", float("nan"))
                 st.metric("⚡ Volatility", f"{vol:.2%}" if not math.isnan(vol) else "N/A")
