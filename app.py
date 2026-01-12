@@ -22,9 +22,13 @@ from src.charts import (
     create_funding_chart,
     create_iv_smile_chart,
     create_macd_chart,
+    create_macro_event_chart,
+    create_macro_panel_chart,
     create_price_chart,
     create_rsi_chart,
     create_skew_pie,
+    create_treasury_spread_chart,
+    create_treasury_yields_chart,
     create_volume_chart,
 )
 from src.config import SYMBOLS
@@ -33,6 +37,8 @@ from src.derivatives import compute_derivatives_metrics
 from src.options import fetch_options_data
 from src.technicals import compute_all_technicals
 from src.utils import extract_ticker, format_currency, format_pct
+from macro_panel import fetch_prices_strict, FetchConfig, PANEL, DISPLAY_ORDER, compute_snapshot
+from treasury_yields import fetch_treasury_yields, SERIES
 
 
 def main():
@@ -444,16 +450,22 @@ def main():
 
         st.markdown("---")
         
-        # ETF Settings
-        st.markdown("### 📊 ETF Settings")
-        etf_period = st.selectbox("ETF Time Period", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"], index=3, key="etf_period")
-        
-        st.markdown("---")
-        
-        # Polymarket Settings
-        st.markdown("### 🎯 Polymarket Settings")
-        polymarket_year = st.number_input("Year", min_value=2024, max_value=2030, value=2026, key="polymarket_year")
-        st.caption("Predictions will be fetched for all selected symbols above")
+        # Macro Event Settings
+        st.markdown("### 🌍 Market Index")
+        macro_period = st.selectbox(
+            "Macro Period",
+            ["1mo", "3mo", "6mo", "1y", "2y"],
+            index=2,
+            key="macro_period",
+            help="Select the historical period for macro data"
+        )
+        macro_interval = st.selectbox(
+            "Macro Interval",
+            ["1d", "1h"],
+            index=0,
+            key="macro_interval",
+            help="Select the data interval"
+        )
         
         st.markdown("---")
         
@@ -525,8 +537,8 @@ def main():
     status_text.empty()
 
     # Main content tabs
-    tab_overview, tab_technicals, tab_derivatives, tab_options, tab_etf, tab_polymarket = st.tabs(
-        ["📈 Market Snapshot", "📊 Technical Analysis", "🔥 Derivatives Intel", "📉 Options Analytics", "📊 ETF Flow Analysis", "🎯 Polymarket Predictions"]
+    tab_overview, tab_technicals, tab_derivatives, tab_options, tab_etf, tab_polymarket, tab_macro, tab_treasury = st.tabs(
+        ["📈 Market Snapshot", "📊 Technical Analysis", "🔥 Derivatives Intel", "📉 Options Analytics", "📊 ETF Flow", "🎯 Polymarket Predictions", "🌍 Market Index & Macro Event", "📊 Treasury Yields"]
     )
 
     # =============================================================================
@@ -819,7 +831,7 @@ def main():
                 )
 
     # =============================================================================
-    # TAB 5: ETF FLOW ANALYSIS
+    # TAB 5: ETF Flow
     # =============================================================================
     with tab_etf:
         st.markdown("### 📊 ETF Flow & Demand Dashboard")
@@ -917,9 +929,9 @@ def main():
             summary_df = pd.DataFrame(summary_list)
             return processed_data, summary_df
 
-        # Fetch ETF data (etf_period is set in main sidebar)
+        # Fetch ETF data
         with st.spinner('Fetching ETF data...'):
-            etf_processed_data, etf_summary_df = fetch_etf_data(etf_tickers, etf_period)
+            etf_processed_data, etf_summary_df = fetch_etf_data(etf_tickers, "1y")
 
         # Summary Metrics
         st.markdown("#### 📝 Summary Metrics")
@@ -972,7 +984,7 @@ def main():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("**Relative Performance (Rebased to 100)**")
+            st.markdown("**Relative Performance**")
             fig_perf = go.Figure()
             for ticker in etf_tickers:
                 if ticker in etf_processed_data:
@@ -998,6 +1010,9 @@ def main():
     with tab_polymarket:
         st.markdown("### 🎯 Polymarket Predictions")
         st.caption("Market predictions and probability analysis from Polymarket (Future Events Only)")
+        
+        # Default year for Polymarket predictions
+        polymarket_year = 2026
         
         # Extract unique tickers from selected symbols
         unique_tickers = list(set([extract_ticker(s) for s in selected_symbols]))
@@ -1296,6 +1311,442 @@ def main():
                             st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("---")
+
+    # =============================================================================
+    # TAB 7: Market Index & Macro Event
+    # =============================================================================
+    with tab_macro:
+        st.markdown("### 🌍 Market Index & Macro Event Dashboard")
+        st.caption("Real-time macro indicators: DXY (Dollar Index), VIX (Volatility), S&P 500, Gold, and Oil")
+        
+        # Fetch macro data
+        @st.cache_data(ttl=3600)  # Cache for 1 hour
+        def fetch_macro_data(period: str, interval: str):
+            """Fetch Market Index & Macro Event data."""
+            cfg = FetchConfig(period=period, interval=interval, auto_adjust=False)
+            try:
+                prices = fetch_prices_strict(PANEL, cfg)
+                snapshot = compute_snapshot(prices)
+                return prices, snapshot
+            except Exception as e:
+                st.error(f"Error fetching macro data: {str(e)}")
+                return pd.DataFrame(), pd.DataFrame()
+        
+        with st.spinner('🔄 Fetching macro data...'):
+            macro_prices, macro_snapshot = fetch_macro_data(macro_period, macro_interval)
+        
+        if macro_prices.empty:
+            st.warning("⚠️ Unable to fetch macro data. Please try again later.")
+        else:
+            # Summary metrics
+            st.markdown("#### 📊 Current Values & Returns")
+            
+            if not macro_snapshot.empty:
+                # Create metrics columns
+                cols = st.columns(len(macro_snapshot))
+                for idx, (symbol, row) in enumerate(macro_snapshot.iterrows()):
+                    with cols[idx]:
+                        last_val = row["Last"]
+                        ret_1 = row["Ret_1"]
+                        ret_5 = row["Ret_5"]
+                        ret_21 = row["Ret_21"]
+                        
+                        # Format value based on symbol
+                        if symbol == "VIX":
+                            val_str = f"{last_val:.2f}"
+                        elif symbol == "DXY":
+                            val_str = f"{last_val:.2f}"
+                        elif symbol == "S&P 500":
+                            val_str = f"{last_val:,.0f}"
+                        elif symbol == "Gold":
+                            val_str = f"${last_val:,.0f}"
+                        elif symbol == "Oil":
+                            val_str = f"${last_val:.2f}"
+                        else:
+                            val_str = f"{last_val:.2f}"
+                        
+                        # Color indicators
+                        trend_1d = "🟢" if ret_1 > 0 else ("🔴" if ret_1 < 0 else "⚪")
+                        trend_5d = "🟢" if ret_5 > 0 else ("🔴" if ret_5 < 0 else "⚪")
+                        trend_21d = "🟢" if ret_21 > 0 else ("🔴" if ret_21 < 0 else "⚪")
+                        
+                        st.markdown(f"#### {symbol}")
+                        st.metric("Current", val_str)
+                        st.metric(
+                            f"{trend_1d} 1d",
+                            f"{ret_1:+.2f}%",
+                            delta_color="normal" if ret_1 >= 0 else "inverse",
+                        )
+                        st.metric(
+                            f"{trend_5d} 5d",
+                            f"{ret_5:+.2f}%",
+                            delta_color="normal" if ret_5 >= 0 else "inverse",
+                        )
+                        st.metric(
+                            f"{trend_21d} 21d",
+                            f"{ret_21:+.2f}%",
+                            delta_color="normal" if ret_21 >= 0 else "inverse",
+                        )
+            
+            st.markdown("---")
+            
+            # Main chart
+            st.markdown("#### 📈 Market Index Chart")
+            st.caption(
+                "Interactive chart showing the evolution of key macro indicators over time. "
+                "Hover over the chart to see detailed values and percentage changes. "
+                "Green fill indicates positive momentum, red fill indicates negative momentum."
+            )
+            
+            macro_chart = create_macro_panel_chart(macro_prices)
+            st.plotly_chart(macro_chart, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Detailed snapshot table
+            st.markdown("#### 📋 Detailed Snapshot")
+            if not macro_snapshot.empty:
+                display_snapshot = macro_snapshot.copy()
+                display_snapshot.columns = ["Last Value", "1-Day Return (%)", "5-Day Return (%)", "21-Day Return (%)"]
+                st.dataframe(
+                    display_snapshot.style.format({
+                        "Last Value": "{:,.2f}",
+                        "1-Day Return (%)": "{:+.2f}",
+                        "5-Day Return (%)": "{:+.2f}",
+                        "21-Day Return (%)": "{:+.2f}",
+                    }),
+                    use_container_width=True,
+                )
+            
+            # Info expander
+            with st.expander("📖 Macro Indicators Guide", expanded=False):
+                st.markdown(
+                    """
+                    | Indicator | Description | What It Measures |
+                    |-----------|-------------|------------------|
+                    | **DXY** | US Dollar Index | Strength of USD against basket of currencies |
+                    | **VIX** | CBOE Volatility Index | Market fear/volatility expectations (30-day) |
+                    | **S&P 500** | S&P 500 Index | Performance of 500 largest US companies |
+                    | **Gold** | Gold Futures (GC=F) | Precious metal commodity price |
+                    | **Oil** | Crude Oil Futures (CL=F) | Energy commodity price (WTI) |
+                    
+                    **Interpretation:**
+                    - **DXY ↑**: Strong dollar → often negative for commodities/emerging markets
+                    - **VIX ↑**: High fear → potential market stress/correction risk
+                    - **S&P 500 ↑**: Bullish equity sentiment
+                    - **Gold ↑**: Safe haven demand, inflation hedge
+                    - **Oil ↑**: Economic growth expectations, supply/demand dynamics
+                    """
+                )
+            
+            st.markdown("---")
+            
+            # =====================================================================
+            # INFLATION & FED RATE INDICATORS
+            # =====================================================================
+            st.markdown("### 📊 Inflation & Federal Reserve Indicators")
+            st.caption("CPI, PCE, PPI inflation rates and Federal Funds Rate from FRED (Federal Reserve Economic Data)")
+            
+            # FRED API key and series definitions
+            FRED_API_KEY = '3e6b3d277d0889cb78aebd2cd1548181'
+            MACRO_EVENT_SERIES = {
+                'CPI (Consumer Inflation)': 'CPIAUCSL',
+                'PCE (Fed Target Inflation)': 'PCEPI',
+                'PPI (Producer Inflation)': 'PPIFIS',
+                'Fed Funds Rate (FOMC)': 'FEDFUNDS'
+            }
+            
+            # Fetch macro event data
+            @st.cache_data(ttl=3600)  # Cache for 1 hour
+            def fetch_macro_event_data(start_date: str = "2018-01-01"):
+                """Fetch macro event data from FRED."""
+                try:
+                    from fredapi import Fred
+                    fred = Fred(api_key=FRED_API_KEY)
+                    
+                    data_dict = {}
+                    for name, s_id in MACRO_EVENT_SERIES.items():
+                        # Fetch data
+                        series = fred.get_series(s_id)
+                        
+                        # Calculate YoY % change for inflation metrics (except for Fed Rate)
+                        if s_id != 'FEDFUNDS':
+                            data_dict[name] = series.pct_change(periods=12) * 100
+                        else:
+                            data_dict[name] = series  # The interest rate is already a percentage
+                    
+                    # Combine into a single DataFrame and filter for recent history
+                    df = pd.DataFrame(data_dict).dropna().loc[start_date:]
+                    return df
+                except ImportError:
+                    return pd.DataFrame()
+                except Exception as e:
+                    st.error(f"Error fetching macro event data: {str(e)}")
+                    return pd.DataFrame()
+            
+            with st.spinner('🔄 Fetching inflation and Fed rate data from FRED...'):
+                macro_event_df = fetch_macro_event_data()
+            
+            if macro_event_df.empty:
+                st.warning("⚠️ Unable to fetch macro event data. Please ensure `fredapi` is installed: `pip install fredapi`")
+            else:
+                # Summary metrics
+                st.markdown("#### 📊 Current Values")
+                
+                if not macro_event_df.empty:
+                    cols = st.columns(4)
+                    last_row = macro_event_df.iloc[-1]
+                    
+                    metrics_data = [
+                        ("CPI (Consumer Inflation)", last_row.get("CPI (Consumer Inflation)", float("nan"))),
+                        ("PCE (Fed Target Inflation)", last_row.get("PCE (Fed Target Inflation)", float("nan"))),
+                        ("PPI (Producer Inflation)", last_row.get("PPI (Producer Inflation)", float("nan"))),
+                        ("Fed Funds Rate (FOMC)", last_row.get("Fed Funds Rate (FOMC)", float("nan"))),
+                    ]
+                    
+                    for idx, (label, value) in enumerate(metrics_data):
+                        with cols[idx]:
+                            if not pd.isna(value):
+                                if "Fed Funds Rate" in label:
+                                    st.metric(label, f"{value:.2f}%")
+                                else:
+                                    st.metric(label, f"{value:.2f}% YoY")
+                            else:
+                                st.metric(label, "N/A")
+                
+                st.markdown("---")
+                
+                # Individual charts for each indicator
+                st.markdown("#### 📈 Individual Indicator Charts")
+                
+                for indicator_name in MACRO_EVENT_SERIES.keys():
+                    if indicator_name in macro_event_df.columns:
+                        indicator_df = pd.DataFrame({indicator_name: macro_event_df[indicator_name]})
+                        chart = create_macro_event_chart(indicator_df, indicator_name)
+                        st.plotly_chart(chart, use_container_width=True)
+                        st.markdown("---")
+                
+                # Data table
+                st.markdown("#### 📋 Detailed Data Table")
+                st.caption("Historical data for all inflation and Fed rate indicators")
+                
+                if not macro_event_df.empty:
+                    display_df = macro_event_df.tail(100).copy()  # Last 100 data points
+                    display_df.index.name = "Date"
+                    
+                    # Format the dataframe for display
+                    styled_df = display_df.style.format({
+                        "CPI (Consumer Inflation)": "{:.2f}%",
+                        "PCE (Fed Target Inflation)": "{:.2f}%",
+                        "PPI (Producer Inflation)": "{:.2f}%",
+                        "Fed Funds Rate (FOMC)": "{:.2f}%",
+                    })
+                    
+                    st.dataframe(styled_df, use_container_width=True, height=400)
+                
+                # Info expander
+                with st.expander("📖 Inflation & Fed Rate Guide", expanded=False):
+                    st.markdown(
+                        """
+                        | Indicator | FRED Code | Description |
+                        |-----------|-----------|-------------|
+                        | **CPI** | CPIAUCSL | Consumer Price Index - measures consumer inflation (YoY %) |
+                        | **PCE** | PCEPI | Personal Consumption Expenditures - Fed's preferred inflation measure (YoY %) |
+                        | **PPI** | PPIFIS | Producer Price Index - measures producer/inflation at wholesale level (YoY %) |
+                        | **Fed Funds Rate** | FEDFUNDS | Federal Funds Rate - interest rate set by FOMC (%) |
+                        
+                        **Key Concepts:**
+                        - **CPI (Consumer Inflation)**: Measures price changes for consumer goods/services
+                        - **PCE (Fed Target Inflation)**: Fed's preferred measure, typically lower than CPI
+                        - **PPI (Producer Inflation)**: Leading indicator, measures wholesale price changes
+                        - **Fed Funds Rate**: Interest rate banks charge each other, set by Federal Reserve
+                        
+                        **Interpretation:**
+                        - **High Inflation (>2-3%)**: Erodes purchasing power, may trigger Fed rate hikes
+                        - **Low Inflation (<2%)**: May indicate weak demand, Fed may lower rates
+                        - **Fed Rate Hikes**: Typically used to combat inflation, can slow economic growth
+                        - **Fed Rate Cuts**: Typically used to stimulate economy, can increase inflation
+                        
+                        **Historical Context:**
+                        - Fed targets 2% PCE inflation over the long run
+                        - CPI typically runs 0.3-0.5% higher than PCE
+                        - PPI often leads CPI by 1-3 months
+                        - Yield curve inversions often follow Fed rate hiking cycles
+                        """
+                    )
+
+    # =============================================================================
+    # TAB 8: TREASURY YIELDS
+    # =============================================================================
+    with tab_treasury:
+        st.markdown("### 📊 Treasury Yields Dashboard")
+        st.caption("US Treasury yield curve analysis: 3M, 2Y, 5Y, 10Y yields and 10Y-2Y spread with inversion tracking")
+        
+        # Treasury settings in sidebar
+        with st.sidebar:
+            st.markdown("---")
+            st.markdown("### 📊 Treasury Settings")
+            treasury_start = st.date_input(
+                "Start Date",
+                value=pd.Timestamp("2015-01-01").date(),
+                key="treasury_start",
+                help="Select the start date for treasury yield data"
+            )
+            treasury_weekly = st.checkbox(
+                "Weekly Resample",
+                value=False,
+                key="treasury_weekly",
+                help="Resample data to weekly (Friday) for smoother plots"
+            )
+        
+        # Fetch treasury data
+        @st.cache_data(ttl=3600)  # Cache for 1 hour
+        def fetch_treasury_data(start_date: str, weekly: bool = False):
+            """Fetch treasury yield data."""
+            try:
+                end_date = pd.Timestamp.today().strftime("%Y-%m-%d")
+                df = fetch_treasury_yields(start_date, end_date)
+                
+                if weekly:
+                    # Friday weekly frequency; last observed value in the week
+                    df = df.resample("W-FRI").last().ffill()
+                
+                # Compute spread
+                if "10Y" in df.columns and "2Y" in df.columns:
+                    df["10Y-2Y"] = df["10Y"] - df["2Y"]
+                
+                return df
+            except Exception as e:
+                st.error(f"Error fetching treasury data: {str(e)}")
+                return pd.DataFrame()
+        
+        with st.spinner('🔄 Fetching treasury yield data...'):
+            treasury_df = fetch_treasury_data(str(treasury_start), treasury_weekly)
+        
+        if treasury_df.empty:
+            st.warning("⚠️ Unable to fetch treasury yield data. Please try again later.")
+            st.info("💡 **Note:** Treasury yield data requires `pandas_datareader` package. Install with: `pip install pandas_datareader`")
+        else:
+            # Summary metrics
+            st.markdown("#### 📊 Current Yield Values")
+            
+            if all(col in treasury_df.columns for col in ["3M", "2Y", "5Y", "10Y"]):
+                cols = st.columns(4)
+                last_row = treasury_df.dropna(subset=["3M", "2Y", "5Y", "10Y"]).iloc[-1] if not treasury_df.empty else None
+                
+                if last_row is not None:
+                    metrics_data = [
+                        ("3M", last_row.get("3M", float("nan"))),
+                        ("2Y", last_row.get("2Y", float("nan"))),
+                        ("5Y", last_row.get("5Y", float("nan"))),
+                        ("10Y", last_row.get("10Y", float("nan"))),
+                    ]
+                    
+                    for idx, (label, value) in enumerate(metrics_data):
+                        with cols[idx]:
+                            if not pd.isna(value):
+                                st.metric(f"{label} Yield", f"{value:.2f}%")
+                            else:
+                                st.metric(f"{label} Yield", "N/A")
+            
+            st.markdown("---")
+            
+            # Yield curve chart
+            st.markdown("#### 📈 Treasury Yield Curve")
+            st.caption(
+                "Interactive chart showing the evolution of US Treasury yields across different maturities. "
+                "The yield curve reflects market expectations for interest rates and economic conditions. "
+                "An inverted yield curve (short-term yields higher than long-term) often signals economic recession risk."
+            )
+            
+            yields_chart = create_treasury_yields_chart(treasury_df[["3M", "2Y", "5Y", "10Y"]] if all(col in treasury_df.columns for col in ["3M", "2Y", "5Y", "10Y"]) else treasury_df)
+            st.plotly_chart(yields_chart, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # Spread chart
+            if "10Y" in treasury_df.columns and "2Y" in treasury_df.columns:
+                st.markdown("#### 📉 10Y-2Y Spread Analysis")
+                st.caption(
+                    "The 10Y-2Y spread is a key indicator of yield curve shape. "
+                    "**Positive spread (normal curve)**: Long-term rates higher than short-term - typical healthy economy. "
+                    "**Negative spread (inverted curve)**: Short-term rates higher than long-term - often precedes recessions. "
+                    "The red shaded areas indicate periods of inversion."
+                )
+                
+                spread_chart = create_treasury_spread_chart(treasury_df[["2Y", "10Y"]])
+                st.plotly_chart(spread_chart, use_container_width=True)
+                
+                # Spread status
+                if "10Y-2Y" in treasury_df.columns:
+                    last_spread = treasury_df["10Y-2Y"].dropna().iloc[-1] if not treasury_df["10Y-2Y"].dropna().empty else None
+                    if last_spread is not None:
+                        st.markdown("---")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if last_spread < 0:
+                                st.error(f"🔴 **CURVE INVERTED** - Spread: {last_spread:.2f} pp")
+                                st.caption("The yield curve is currently inverted, which historically has been a recession warning signal.")
+                            else:
+                                st.success(f"🟢 **CURVE NORMAL** - Spread: {last_spread:.2f} pp")
+                                st.caption("The yield curve is in a normal state with long-term rates above short-term rates.")
+                        with col2:
+                            spread_change = treasury_df["10Y-2Y"].dropna().iloc[-1] - treasury_df["10Y-2Y"].dropna().iloc[-2] if len(treasury_df["10Y-2Y"].dropna()) > 1 else 0
+                            if spread_change > 0:
+                                st.info(f"📈 **Steepening** - Spread increased by {spread_change:.2f} pp")
+                            elif spread_change < 0:
+                                st.warning(f"📉 **Flattening** - Spread decreased by {abs(spread_change):.2f} pp")
+                            else:
+                                st.info("➡️ **Stable** - No change in spread")
+            
+            st.markdown("---")
+            
+            # Data table
+            with st.expander("📋 Detailed Yield Data (Last 30 Days)", expanded=False):
+                if not treasury_df.empty:
+                    display_df = treasury_df.tail(30).copy()
+                    display_df.index.name = "Date"
+                    st.dataframe(
+                        display_df.style.format({
+                            "3M": "{:.2f}%",
+                            "2Y": "{:.2f}%",
+                            "5Y": "{:.2f}%",
+                            "10Y": "{:.2f}%",
+                            "10Y-2Y": "{:.2f} pp",
+                        }) if "10Y-2Y" in display_df.columns else display_df.style.format({
+                            "3M": "{:.2f}%",
+                            "2Y": "{:.2f}%",
+                            "5Y": "{:.2f}%",
+                            "10Y": "{:.2f}%",
+                        }),
+                        use_container_width=True,
+                    )
+            
+            # Info expander
+            with st.expander("📖 Treasury Yields Guide", expanded=False):
+                st.markdown(
+                    """
+                    | Maturity | FRED Code | Description |
+                    |----------|-----------|-------------|
+                    | **3M** | DGS3MO | 3-Month Treasury Bill Rate |
+                    | **2Y** | DGS2 | 2-Year Treasury Note Rate |
+                    | **5Y** | DGS5 | 5-Year Treasury Note Rate |
+                    | **10Y** | DGS10 | 10-Year Treasury Note Rate |
+                    
+                    **Key Concepts:**
+                    - **Yield Curve**: Graph showing yields across different maturities
+                    - **Normal Curve**: Upward sloping (long-term > short-term) - healthy economy
+                    - **Inverted Curve**: Downward sloping (short-term > long-term) - recession warning
+                    - **10Y-2Y Spread**: Difference between 10-year and 2-year yields
+                    - **Steepening**: Spread increasing (economic expansion expected)
+                    - **Flattening**: Spread decreasing (economic slowdown expected)
+                    
+                    **Historical Context:**
+                    - Yield curve inversions have preceded every US recession since 1955
+                    - Inversion typically occurs 6-18 months before recession
+                    - The 10Y-2Y spread is one of the most watched economic indicators
+                    """
+                )
 
     # Footer
     st.markdown("---")
