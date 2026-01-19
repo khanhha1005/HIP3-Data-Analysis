@@ -34,6 +34,13 @@ from src.charts import (
 from src.config import SYMBOLS
 from src.data_classes import DerivativesMetrics
 from src.derivatives import compute_derivatives_metrics
+from src.llm_predictions import (
+    build_event_payload,
+    has_openai_key,
+    llm_filter_predictions,
+    DEFAULT_MODEL,
+    COMPANY_ALIASES,
+)
 from src.options import fetch_options_data
 from src.technicals import compute_all_technicals
 from src.utils import extract_ticker, format_currency, format_pct
@@ -1004,6 +1011,25 @@ def main():
             st.markdown("---")
             return
 
+        llm_enabled = st.checkbox(
+            "🤖 Use LLM to filter related predictions",
+            value=has_openai_key(),
+            help="Requires OPENAI_API_KEY in your environment.",
+        )
+        llm_model = st.text_input(
+            "LLM model",
+            value=DEFAULT_MODEL,
+            help="Overrides default model for OpenAI filtering.",
+        )
+        if llm_enabled and not has_openai_key():
+            st.info("Set `OPENAI_API_KEY` to enable LLM filtering.")
+
+        include_non_price = st.checkbox(
+            "Include non-price prediction queries (earnings, guidance, M&A)",
+            value=True,
+            help="Adds more search queries beyond price targets.",
+        )
+
         # Helper functions from polymarket_price_predictions.py
         def safe_json_list(value):
             """Safely parse JSON list from various formats."""
@@ -1063,6 +1089,42 @@ def main():
             elif ">" in label:
                 key += 0.1
             return key
+
+        def is_stock_prediction_event(event):
+            """Filter to price, volume, revenue, or stock outlook/insight events."""
+            allowed_keywords = [
+                "price",
+                "target",
+                "close",
+                "closes",
+                "hit",
+                "above",
+                "below",
+                "volume",
+                "revenue",
+                "sales",
+                "outlook",
+                "guidance",
+                "forecast",
+                "insight",
+                "stock",
+                "shares",
+            ]
+            text_parts = [
+                event.get("title", ""),
+                event.get("slug", ""),
+                event.get("description", ""),
+            ]
+            for market in event.get("markets", []) or []:
+                text_parts.append(market.get("question", ""))
+                text_parts.append(market.get("groupItemTitle", ""))
+                text_parts.append(market.get("slug", ""))
+            haystack = " ".join([p for p in text_parts if p]).lower()
+            return any(k in haystack for k in allowed_keywords)
+
+        @st.cache_data(ttl=900, show_spinner=False)
+        def llm_filter_predictions_cached(symbol, events_payload, model_name):
+            return llm_filter_predictions(symbol, events_payload, model=model_name)
 
         @st.cache_data(ttl=3600)
         def search_polymarket_events(query, max_pages=3):
@@ -1134,12 +1196,38 @@ def main():
             progress_text.text(f"🔍 Searching {ticker}... ({idx + 1}/{total_tickers})")
             
             # Build search queries for this ticker
-            queries = [
+            base_queries = [
                 f"{ticker} {polymarket_year}",
                 f"{ticker} close {polymarket_year}",
                 f"{ticker} closes {polymarket_year}",
+                f"{ticker} price {polymarket_year}",
                 f"{ticker} hit {polymarket_year}",
             ]
+            aliases = COMPANY_ALIASES.get(ticker, [])
+            for alias in aliases:
+                base_queries.append(f"{alias} {polymarket_year}")
+                base_queries.append(f"{alias} stock {polymarket_year}")
+
+            extra_queries = []
+            if include_non_price:
+                extra_queries = [
+                    f"{ticker} earnings {polymarket_year}",
+                    f"{ticker} EPS {polymarket_year}",
+                    f"{ticker} revenue {polymarket_year}",
+                    f"{ticker} guidance {polymarket_year}",
+                    f"{ticker} acquisition",
+                    f"{ticker} merger",
+                    f"{ticker} bankruptcy",
+                    f"{ticker} dividend",
+                    f"{ticker} buyback",
+                    f"{ticker} CEO",
+                ]
+                for alias in aliases:
+                    extra_queries.append(f"{alias} earnings {polymarket_year}")
+                    extra_queries.append(f"{alias} EPS {polymarket_year}")
+                    extra_queries.append(f"{alias} guidance {polymarket_year}")
+
+            queries = list(dict.fromkeys(base_queries + extra_queries))
             
             # Search for events
             all_events = []
@@ -1181,6 +1269,9 @@ def main():
                                     unwanted_keywords = ['sanremo', 'winner', 'festival', 'music', 'election', 'sport']
                                     if any(keyword in event_title or keyword in event_slug for keyword in unwanted_keywords):
                                         continue
+
+                                    if not is_stock_prediction_event(full_event):
+                                        continue
                                     
                                     future_events.append(full_event)
                     except Exception:
@@ -1193,6 +1284,23 @@ def main():
         
         progress_bar.empty()
         progress_text.empty()
+
+        llm_results = {}
+        if llm_enabled and has_openai_key() and all_future_events:
+            llm_progress_text = st.empty()
+            llm_progress_bar = st.progress(0)
+            llm_total = len(all_future_events)
+            for idx, (ticker, events) in enumerate(all_future_events.items()):
+                llm_progress = (idx + 1) / llm_total
+                llm_progress_bar.progress(llm_progress)
+                llm_progress_text.text(f"🤖 LLM filtering {ticker}... ({idx + 1}/{llm_total})")
+                try:
+                    payload = build_event_payload(events)
+                    llm_results[ticker] = llm_filter_predictions_cached(ticker, payload, llm_model)
+                except Exception as e:
+                    llm_results[ticker] = {"related_events": [], "summary": "", "error": str(e)}
+            llm_progress_bar.empty()
+            llm_progress_text.empty()
         
         # Display results
         total_events = sum(len(events) for events in all_future_events.values())
@@ -1209,6 +1317,26 @@ def main():
                 
                 events = all_future_events[ticker]
                 st.markdown(f"### 📊 {ticker} Predictions")
+                base_event_count = len(events)
+                llm_result = llm_results.get(ticker)
+                if llm_enabled and llm_result and not llm_result.get("error"):
+                    related = llm_result.get("related_events") or []
+                    related_slugs = {r.get("slug") for r in related if r.get("slug")}
+                    if related_slugs:
+                        events = [ev for ev in events if ev.get("slug") in related_slugs]
+                        st.caption(f"🤖 LLM matched {len(events)} of {base_event_count} event(s).")
+                    else:
+                        st.caption("🤖 LLM found no related events for this symbol.")
+                    summary = llm_result.get("summary")
+                    if summary:
+                        st.info(f"🤖 {summary}")
+                elif llm_enabled and llm_result and llm_result.get("error"):
+                    st.warning(f"LLM filtering error for {ticker}: {llm_result.get('error')}")
+
+                if not events:
+                    st.info("No related prediction events to display.")
+                    st.markdown("---")
+                    continue
                 
                 for event in events:
                     markets = event.get('markets', [])
@@ -1240,9 +1368,13 @@ def main():
                             "SortKey": sort_key_from_label(label)
                         })
                     
+                    if len(rows) <= 1:
+                        continue
                     if rows:
                         df = pd.DataFrame(rows)
                         df = df.sort_values(by="SortKey")
+                        if df["Probability"].fillna(0).max() <= 0:
+                            continue
                         
                         # For cumulative markets (like "Will it hit $X?"), multiple values can be 100%
                         # This is normal - it means the price has already exceeded those levels
@@ -1263,7 +1395,11 @@ def main():
                             total_prob = df['Probability'].sum()
                             max_prob_count = (df['Probability'] >= 0.99).sum()
                             if max_prob_count > 1 and total_prob > 2:
-                                st.info("ℹ️ **Note:** This is a cumulative market. Multiple price targets can have high probabilities because each market asks 'Will the price hit $X?' independently. If the current price exceeds a target, that target shows ~100%.")
+                                st.info(
+                                    "ℹ️ **Note:** This is a cumulative market. Multiple price targets can have high probabilities because each "
+                                    "market asks 'Will the price hit $X?' independently. If the current price exceeds a target, that target "
+                                    "shows ~100%. **Example:** Current price $180 → 'Hit $150?' ≈100%, 'Hit $170?' ≈100%, 'Hit $200?' might be 40%."
+                                )
                             
                             fig = go.Figure()
                             
@@ -1279,8 +1415,7 @@ def main():
                             ))
                             
                             fig.update_layout(
-                                title=f"{ticker} Price Prediction",
-                                xaxis_title="Price Target (USD)",
+                                xaxis_title="Prediction Target",
                                 yaxis_title="Probability",
                                 yaxis_tickformat='.0%',
                                 template="plotly_white",
@@ -1289,7 +1424,8 @@ def main():
                             )
                             fig.update_xaxes(tickangle=45)
                             
-                            st.plotly_chart(fig, use_container_width=True)
+                            plot_key = f"pm_{ticker}_{event.get('slug', event_title)}"
+                            st.plotly_chart(fig, use_container_width=True, key=plot_key)
                 
                 st.markdown("---")
 
