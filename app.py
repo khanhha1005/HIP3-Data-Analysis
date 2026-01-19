@@ -1122,6 +1122,99 @@ def main():
             haystack = " ".join([p for p in text_parts if p]).lower()
             return any(k in haystack for k in allowed_keywords)
 
+        def is_volume_event(event):
+            """Identify volume-focused prediction events."""
+            volume_keywords = [
+                "volume",
+                "trading volume",
+                "shares traded",
+                "turnover",
+                "liquidity",
+            ]
+            text_parts = [
+                event.get("title", ""),
+                event.get("slug", ""),
+                event.get("description", ""),
+            ]
+            for market in event.get("markets", []) or []:
+                text_parts.append(market.get("question", ""))
+                text_parts.append(market.get("groupItemTitle", ""))
+                text_parts.append(market.get("slug", ""))
+            haystack = " ".join([p for p in text_parts if p]).lower()
+            return any(k in haystack for k in volume_keywords)
+
+        def compute_polymarket_perp_signal(events):
+            """Infer a long/short bias from Polymarket markets."""
+            long_keywords = ["long", "bullish", "up", "rise", "higher", "above", "increase"]
+            short_keywords = ["short", "bearish", "down", "fall", "lower", "below", "decrease"]
+            long_probs = []
+            short_probs = []
+            used_markets = []
+            for ev in events:
+                for market in ev.get("markets", []) or []:
+                    question = " ".join([
+                        market.get("question", ""),
+                        market.get("groupItemTitle", ""),
+                        market.get("slug", ""),
+                    ]).lower()
+                    yes_p = extract_yes_probability(market)
+                    if yes_p is None:
+                        continue
+                    if any(k in question for k in long_keywords):
+                        long_probs.append(yes_p)
+                        used_markets.append({
+                            "Event": ev.get("title", "Unknown Event"),
+                            "Market": market.get("question") or market.get("groupItemTitle") or market.get("slug") or "Unknown",
+                            "Direction": "Long/Bullish",
+                            "YesProbability": yes_p,
+                        })
+                    if any(k in question for k in short_keywords):
+                        short_probs.append(yes_p)
+                        used_markets.append({
+                            "Event": ev.get("title", "Unknown Event"),
+                            "Market": market.get("question") or market.get("groupItemTitle") or market.get("slug") or "Unknown",
+                            "Direction": "Short/Bearish",
+                            "YesProbability": yes_p,
+                        })
+
+            long_avg = float(np.mean(long_probs)) if long_probs else None
+            short_avg = float(np.mean(short_probs)) if short_probs else None
+
+            if long_avg is None and short_avg is None:
+                return {"signal": "No signal", "long_avg": None, "short_avg": None, "count": 0, "markets": []}
+            if short_avg is None:
+                return {
+                    "signal": "Long bias",
+                    "long_avg": long_avg,
+                    "short_avg": None,
+                    "count": len(long_probs),
+                    "markets": used_markets,
+                }
+            if long_avg is None:
+                return {
+                    "signal": "Short bias",
+                    "long_avg": None,
+                    "short_avg": short_avg,
+                    "count": len(short_probs),
+                    "markets": used_markets,
+                }
+
+            diff = long_avg - short_avg
+            if diff > 0.1:
+                signal = "Long bias"
+            elif diff < -0.1:
+                signal = "Short bias"
+            else:
+                signal = "Neutral"
+
+            return {
+                "signal": signal,
+                "long_avg": long_avg,
+                "short_avg": short_avg,
+                "count": len(long_probs) + len(short_probs),
+                "markets": used_markets,
+            }
+
         @st.cache_data(ttl=900, show_spinner=False)
         def llm_filter_predictions_cached(symbol, events_payload, model_name):
             return llm_filter_predictions(symbol, events_payload, model=model_name)
@@ -1214,6 +1307,14 @@ def main():
                     f"{ticker} earnings {polymarket_year}",
                     f"{ticker} EPS {polymarket_year}",
                     f"{ticker} revenue {polymarket_year}",
+                    f"{ticker} trading volume {polymarket_year}",
+                    f"{ticker} volume {polymarket_year}",
+                    f"{ticker} shares traded {polymarket_year}",
+                    f"{ticker} turnover {polymarket_year}",
+                    f"{ticker} bullish {polymarket_year}",
+                    f"{ticker} bearish {polymarket_year}",
+                    f"{ticker} long {polymarket_year}",
+                    f"{ticker} short {polymarket_year}",
                     f"{ticker} guidance {polymarket_year}",
                     f"{ticker} acquisition",
                     f"{ticker} merger",
@@ -1226,6 +1327,8 @@ def main():
                     extra_queries.append(f"{alias} earnings {polymarket_year}")
                     extra_queries.append(f"{alias} EPS {polymarket_year}")
                     extra_queries.append(f"{alias} guidance {polymarket_year}")
+                    extra_queries.append(f"{alias} volume {polymarket_year}")
+                    extra_queries.append(f"{alias} trading volume {polymarket_year}")
 
             queries = list(dict.fromkeys(base_queries + extra_queries))
             
@@ -1337,95 +1440,124 @@ def main():
                     st.info("No related prediction events to display.")
                     st.markdown("---")
                     continue
+
+                perp_signal = compute_polymarket_perp_signal(events)
+                st.markdown("#### 📍 Perp Long/Short Signal (Polymarket)")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Signal", perp_signal["signal"])
+                with col2:
+                    long_avg = perp_signal.get("long_avg")
+                    st.metric("Long prob (avg)", f"{long_avg:.1%}" if long_avg is not None else "N/A")
+                with col3:
+                    short_avg = perp_signal.get("short_avg")
+                    st.metric("Short prob (avg)", f"{short_avg:.1%}" if short_avg is not None else "N/A")
+                if perp_signal.get("count", 0) > 0:
+                    st.caption(f"Based on {perp_signal['count']} market(s).")
+                    markets_df = pd.DataFrame(perp_signal.get("markets", []))
+                    if not markets_df.empty:
+                        st.dataframe(
+                            markets_df,
+                            use_container_width=True,
+                            hide_index=True,
+                        )
+                st.markdown("---")
+
+                volume_events = [ev for ev in events if is_volume_event(ev)]
+                non_volume_events = [ev for ev in events if ev not in volume_events]
+                if volume_events:
+                    st.markdown("#### 📊 Volume Predictions")
+                event_groups = [(volume_events, True), (non_volume_events, False)]
                 
-                for event in events:
-                    markets = event.get('markets', [])
-                    if not markets:
-                        continue
-                    
-                    rows = []
-                    seen_labels = {}  # Track best probability for each label
-                    for market in markets:
-                        label = market_target_label(market)
-                        yes_p = extract_yes_probability(market)
-                        
-                        if yes_p is not None:
-                            # For range markets, if same label appears multiple times,
-                            # keep the one with highest probability (or non-zero if available)
-                            if label in seen_labels:
-                                # Only update if this probability is more meaningful
-                                current_prob = seen_labels[label]
-                                if yes_p > current_prob or (current_prob == 0 and yes_p > 0):
-                                    seen_labels[label] = yes_p
-                            else:
-                                seen_labels[label] = yes_p
-                    
-                    # Convert to list of rows
-                    for label, prob in seen_labels.items():
-                        rows.append({
-                            "Target": label,
-                            "Probability": prob,
-                            "SortKey": sort_key_from_label(label)
-                        })
-                    
-                    if len(rows) <= 1:
-                        continue
-                    if rows:
-                        df = pd.DataFrame(rows)
-                        df = df.sort_values(by="SortKey")
-                        if df["Probability"].fillna(0).max() <= 0:
+                for group_events, is_volume in event_groups:
+                    for event in group_events:
+                        markets = event.get('markets', [])
+                        if not markets:
                             continue
-                        
-                        # For cumulative markets (like "Will it hit $X?"), multiple values can be 100%
-                        # This is normal - it means the price has already exceeded those levels
-                        
-                        # Create bar plot
-                        event_title = event.get('title', 'Unknown Event')
-                        event_end = event.get('endDate', '')
-                        
-                        with st.expander(f"📈 {event_title}", expanded=True):
-                            if event_end:
-                                try:
-                                    end_date = datetime.fromisoformat(event_end.replace("Z", "+00:00"))
-                                    st.caption(f"End Date: {end_date.strftime('%Y-%m-%d %H:%M UTC')}")
-                                except Exception:
-                                    st.caption(f"End Date: {event_end}")
+                        rows = []
+                        seen_labels = {}  # Track best probability for each label
+                        for market in markets:
+                            label = market_target_label(market)
+                            yes_p = extract_yes_probability(market)
                             
-                            # Add explanation for cumulative markets
-                            total_prob = df['Probability'].sum()
-                            max_prob_count = (df['Probability'] >= 0.99).sum()
-                            if max_prob_count > 1 and total_prob > 2:
-                                st.info(
-                                    "ℹ️ **Note:** This is a cumulative market. Multiple price targets can have high probabilities because each "
-                                    "market asks 'Will the price hit $X?' independently. If the current price exceeds a target, that target "
-                                    "shows ~100%. **Example:** Current price $180 → 'Hit $150?' ≈100%, 'Hit $170?' ≈100%, 'Hit $200?' might be 40%."
+                            if yes_p is not None:
+                                # For range markets, if same label appears multiple times,
+                                # keep the one with highest probability (or non-zero if available)
+                                if label in seen_labels:
+                                    # Only update if this probability is more meaningful
+                                    current_prob = seen_labels[label]
+                                    if yes_p > current_prob or (current_prob == 0 and yes_p > 0):
+                                        seen_labels[label] = yes_p
+                                else:
+                                    seen_labels[label] = yes_p
+                        
+                        # Convert to list of rows
+                        for label, prob in seen_labels.items():
+                            rows.append({
+                                "Target": label,
+                                "Probability": prob,
+                                "SortKey": sort_key_from_label(label)
+                            })
+                        
+                        if len(rows) <= 1:
+                            continue
+                        if rows:
+                            df = pd.DataFrame(rows)
+                            df = df.sort_values(by="SortKey")
+                            if df["Probability"].fillna(0).max() <= 0:
+                                continue
+                            
+                            # For cumulative markets (like "Will it hit $X?"), multiple values can be 100%
+                            # This is normal - it means the price has already exceeded those levels
+                            
+                            # Create bar plot
+                            event_title = event.get('title', 'Unknown Event')
+                            event_end = event.get('endDate', '')
+                            
+                            with st.expander(f"📈 {event_title}", expanded=True):
+                                if event_end:
+                                    try:
+                                        end_date = datetime.fromisoformat(event_end.replace("Z", "+00:00"))
+                                        st.caption(f"End Date: {end_date.strftime('%Y-%m-%d %H:%M UTC')}")
+                                    except Exception:
+                                        st.caption(f"End Date: {event_end}")
+                                
+                                # Add explanation for cumulative markets
+                                total_prob = df['Probability'].sum()
+                                max_prob_count = (df['Probability'] >= 0.99).sum()
+                                if max_prob_count > 1 and total_prob > 2:
+                                    st.info(
+                                        "ℹ️ **Note:** This is a cumulative market. Multiple price targets can have high probabilities because each "
+                                        "market asks 'Will the price hit $X?' independently. If the current price exceeds a target, that target "
+                                        "shows ~100%. **Example:** Current price $180 → 'Hit $150?' ≈100%, 'Hit $170?' ≈100%, 'Hit $200?' might be 40%."
+                                    )
+                                
+                                fig = go.Figure()
+                                
+                                colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
+                                
+                                fig.add_trace(go.Bar(
+                                    x=df['Target'],
+                                    y=df['Probability'],
+                                    marker_color=colors,
+                                    text=[f"{p:.1%}" for p in df['Probability']],
+                                    textposition='outside',
+                                    name='Probability'
+                                ))
+                                
+                                fig.update_layout(
+                                    xaxis_title="Prediction Target",
+                                    yaxis_title="Probability",
+                                    yaxis_tickformat='.0%',
+                                    template="plotly_white",
+                                    hovermode="x unified",
+                                    height=500
                                 )
-                            
-                            fig = go.Figure()
-                            
-                            colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df['Probability']]
-                            
-                            fig.add_trace(go.Bar(
-                                x=df['Target'],
-                                y=df['Probability'],
-                                marker_color=colors,
-                                text=[f"{p:.1%}" for p in df['Probability']],
-                                textposition='outside',
-                                name='Probability'
-                            ))
-                            
-                            fig.update_layout(
-                                xaxis_title="Prediction Target",
-                                yaxis_title="Probability",
-                                yaxis_tickformat='.0%',
-                                template="plotly_white",
-                                hovermode="x unified",
-                                height=500
-                            )
-                            fig.update_xaxes(tickangle=45)
-                            
-                            plot_key = f"pm_{ticker}_{event.get('slug', event_title)}"
-                            st.plotly_chart(fig, use_container_width=True, key=plot_key)
+                                fig.update_xaxes(tickangle=45)
+                                
+                                group_prefix = "vol" if is_volume else "other"
+                                plot_key = f"pm_{group_prefix}_{ticker}_{event.get('slug', event_title)}"
+                                st.plotly_chart(fig, use_container_width=True, key=plot_key)
                 
                 st.markdown("---")
 
