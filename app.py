@@ -37,8 +37,10 @@ from src.derivatives import compute_derivatives_metrics
 from src.llm_predictions import (
     build_event_payload,
     has_openai_key,
+    has_gemini_key,
     llm_filter_predictions,
     DEFAULT_MODEL,
+    DEFAULT_GEMINI_MODEL,
     COMPANY_ALIASES,
 )
 from src.options import fetch_options_data
@@ -1016,13 +1018,21 @@ def main():
             value=has_openai_key(),
             help="Requires OPENAI_API_KEY in your environment.",
         )
+        llm_provider = st.selectbox(
+            "LLM provider",
+            options=["openai", "gemini"],
+            index=0,
+        )
+        llm_model_default = DEFAULT_MODEL if llm_provider == "openai" else DEFAULT_GEMINI_MODEL
         llm_model = st.text_input(
             "LLM model",
-            value=DEFAULT_MODEL,
-            help="Overrides default model for OpenAI filtering.",
+            value=llm_model_default,
+            help="Overrides default model for the selected provider.",
         )
         if llm_enabled and not has_openai_key():
             st.info("Set `OPENAI_API_KEY` to enable LLM filtering.")
+        if llm_enabled and llm_provider == "gemini" and not has_gemini_key():
+            st.info("Set `GEMINI_API_KEY` to enable Gemini filtering.")
 
         include_non_price = st.checkbox(
             "Include non-price prediction queries (earnings, guidance, M&A)",
@@ -1216,8 +1226,13 @@ def main():
             }
 
         @st.cache_data(ttl=900, show_spinner=False)
-        def llm_filter_predictions_cached(symbol, events_payload, model_name):
-            return llm_filter_predictions(symbol, events_payload, model=model_name)
+        def llm_filter_predictions_cached(symbol, events_payload, model_name, provider_name):
+            return llm_filter_predictions(
+                symbol,
+                events_payload,
+                model=model_name,
+                provider=provider_name,
+            )
 
         @st.cache_data(ttl=3600)
         def search_polymarket_events(query, max_pages=3):
@@ -1389,7 +1404,7 @@ def main():
         progress_text.empty()
 
         llm_results = {}
-        if llm_enabled and has_openai_key() and all_future_events:
+        if llm_enabled and all_future_events:
             llm_progress_text = st.empty()
             llm_progress_bar = st.progress(0)
             llm_total = len(all_future_events)
@@ -1399,7 +1414,7 @@ def main():
                 llm_progress_text.text(f"🤖 LLM filtering {ticker}... ({idx + 1}/{llm_total})")
                 try:
                     payload = build_event_payload(events)
-                    llm_results[ticker] = llm_filter_predictions_cached(ticker, payload, llm_model)
+                    llm_results[ticker] = llm_filter_predictions_cached(ticker, payload, llm_model, llm_provider)
                 except Exception as e:
                     llm_results[ticker] = {"related_events": [], "summary": "", "error": str(e)}
             llm_progress_bar.empty()
