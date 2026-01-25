@@ -2,65 +2,38 @@
 Options functions for Voyager Dashboard
 """
 
-import time
 import warnings
 from typing import Any, Dict, Optional
 
 import pandas as pd
 import streamlit as st
 import yfinance as yf
-import requests
 
 
-def _yf_session() -> requests.Session:
-    session = requests.Session()
-    session.headers.update(
-        {
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/122.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Connection": "keep-alive",
-        }
-    )
-    return session
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)  # Reduced TTL to 5 minutes
 def fetch_options_data(ticker: str) -> Optional[Dict[str, Any]]:
     """Fetch options data from yfinance with robust error handling."""
     try:
         warnings.filterwarnings("ignore")
-        
-        session = _yf_session()
-        tk = yf.Ticker(ticker, session=session)
+        tk = yf.Ticker(ticker)
         
         # Try to get options expirations
-        exps = None
-        for _ in range(2):
-            try:
-                exps = tk.options
-                if exps:
-                    break
-            except Exception:
-                time.sleep(0.5)
+        try:
+            exps = tk.options
+        except Exception as e:
+            print(f"[Options] {ticker}: Failed to get expirations - {e}")
+            return None
+
         if not exps:
+            print(f"[Options] {ticker}: No expirations available")
             return None
 
         # Get nearest expiry
         nearest_expiry = exps[0]
         
-        opt_chain = None
-        for _ in range(2):
-            try:
-                opt_chain = tk.option_chain(nearest_expiry)
-                break
-            except Exception:
-                time.sleep(0.5)
-        if opt_chain is None:
+        try:
+            opt_chain = tk.option_chain(nearest_expiry)
+        except Exception:
             return None
 
         calls = opt_chain.calls.copy()
@@ -146,5 +119,11 @@ def fetch_options_data(ticker: str) -> Optional[Dict[str, Any]]:
         }
 
     except Exception as e:
+        print(f"[Options] {ticker}: Unexpected error - {e}")
         return None
+
+
+def clear_options_cache():
+    """Clear the options data cache."""
+    fetch_options_data.clear()
 

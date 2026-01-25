@@ -43,7 +43,7 @@ from src.llm_predictions import (
     DEFAULT_GEMINI_MODEL,
     COMPANY_ALIASES,
 )
-from src.options import fetch_options_data
+from src.options import fetch_options_data, clear_options_cache
 from src.technicals import compute_all_technicals
 from src.utils import extract_ticker, format_currency, format_pct
 from macro_panel import fetch_prices_strict, FetchConfig, PANEL, DISPLAY_ORDER, compute_snapshot
@@ -452,10 +452,16 @@ def main():
             st.markdown("**Funding**")
             st.caption("⏱️ 1 hour")
             st.markdown("**Options**")
-            st.caption("⏱️ 6 hours")
+            st.caption("⏱️ 5 min")
         with col2:
             st.markdown("**Price**")
             st.caption("⏱️ 4 hours")
+        
+        # Cache clearing button
+        if st.button("🔄 Clear Options Cache"):
+            clear_options_cache()
+            st.success("✅ Options cache cleared!")
+            st.rerun()
 
         st.markdown("---")
         
