@@ -8,10 +8,8 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
 import google.generativeai as genai
 
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-002")
 
 LLM_SYSTEM_PROMPT = (
@@ -40,10 +38,6 @@ COMPANY_ALIASES: Dict[str, List[str]] = {
     "COIN": ["Coinbase"],
     "ORCL": ["Oracle"],
 }
-
-
-def has_openai_key() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY"))
 
 
 def has_gemini_key() -> bool:
@@ -78,23 +72,14 @@ def llm_filter_predictions(
     symbol: str,
     events: List[Dict[str, Any]],
     model: Optional[str] = None,
-    provider: str = "openai",
 ) -> Dict[str, Any]:
-    if provider == "gemini" and (not has_gemini_key() or not events):
+    if not has_gemini_key() or not events:
         return {
             "related_events": [],
             "summary": "",
             "model": model or DEFAULT_GEMINI_MODEL,
             "skipped": True,
             "provider": "gemini",
-        }
-    if provider != "gemini" and (not has_openai_key() or not events):
-        return {
-            "related_events": [],
-            "summary": "",
-            "model": model or DEFAULT_MODEL,
-            "skipped": True,
-            "provider": "openai",
         }
 
     symbol_aliases = COMPANY_ALIASES.get(symbol, [])
@@ -105,58 +90,42 @@ def llm_filter_predictions(
         "events": events,
     }
 
-    if provider == "gemini":
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model_name = model or DEFAULT_GEMINI_MODEL
-        fallback_models = [
-            model_name,
-            "gemini-1.5-flash-002",
-            "gemini-1.5-flash-latest",
-        ]
-        last_error = None
-        content = "{}"
-        model_used = model_name
-        for candidate in fallback_models:
-            try:
-                gemini_model = genai.GenerativeModel(
-                    candidate,
-                    system_instruction=LLM_SYSTEM_PROMPT,
-                )
-                response = gemini_model.generate_content(
-                    json.dumps(payload),
-                    generation_config={"temperature": 0.2},
-                )
-                content = response.text or "{}"
-                model_used = candidate
-                last_error = None
-                break
-            except Exception as e:
-                last_error = e
-                continue
-        if last_error is not None:
-            return {
-                "related_events": [],
-                "summary": "",
-                "model": model_used,
-                "skipped": False,
-                "provider": "gemini",
-                "error": str(last_error),
-            }
-        provider_used = "gemini"
-    else:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        response = client.chat.completions.create(
-            model=model or DEFAULT_MODEL,
-            temperature=0.2,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": LLM_SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(payload)},
-            ],
-        )
-        content = response.choices[0].message.content or "{}"
-        model_used = model or DEFAULT_MODEL
-        provider_used = "openai"
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    model_name = model or DEFAULT_GEMINI_MODEL
+    fallback_models = [
+        model_name,
+        "gemini-1.5-flash-002",
+        "gemini-1.5-flash-latest",
+    ]
+    last_error = None
+    content = "{}"
+    model_used = model_name
+    for candidate in fallback_models:
+        try:
+            gemini_model = genai.GenerativeModel(
+                candidate,
+                system_instruction=LLM_SYSTEM_PROMPT,
+            )
+            response = gemini_model.generate_content(
+                json.dumps(payload),
+                generation_config={"temperature": 0.2},
+            )
+            content = response.text or "{}"
+            model_used = candidate
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            continue
+    if last_error is not None:
+        return {
+            "related_events": [],
+            "summary": "",
+            "model": model_used,
+            "skipped": False,
+            "provider": "gemini",
+            "error": str(last_error),
+        }
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
@@ -175,5 +144,5 @@ def llm_filter_predictions(
         "summary": summary,
         "model": model_used,
         "skipped": False,
-        "provider": provider_used,
+        "provider": "gemini",
     }
