@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
 
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-002")
+DEFAULT_GEMINI_MODEL = "models/gemini-2.0-flash"
 
 LLM_SYSTEM_PROMPT = (
     "You are an equity prediction analyst. You will be given a target symbol "
@@ -92,39 +92,24 @@ def llm_filter_predictions(
 
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
     model_name = model or DEFAULT_GEMINI_MODEL
-    fallback_models = [
-        model_name,
-        "gemini-1.5-flash-002",
-        "gemini-1.5-flash-latest",
-    ]
-    last_error = None
-    content = "{}"
-    model_used = model_name
-    for candidate in fallback_models:
-        try:
-            gemini_model = genai.GenerativeModel(
-                candidate,
-                system_instruction=LLM_SYSTEM_PROMPT,
-            )
-            response = gemini_model.generate_content(
-                json.dumps(payload),
-                generation_config={"temperature": 0.2},
-            )
-            content = response.text or "{}"
-            model_used = candidate
-            last_error = None
-            break
-        except Exception as e:
-            last_error = e
-            continue
-    if last_error is not None:
+    try:
+        gemini_model = genai.GenerativeModel(
+            model_name,
+            system_instruction=LLM_SYSTEM_PROMPT,
+        )
+        response = gemini_model.generate_content(
+            json.dumps(payload),
+            generation_config={"temperature": 0.2},
+        )
+        content = response.text or "{}"
+    except Exception as e:
         return {
             "related_events": [],
             "summary": "",
-            "model": model_used,
+            "model": model_name,
             "skipped": False,
             "provider": "gemini",
-            "error": str(last_error),
+            "error": str(e),
         }
     try:
         data = json.loads(content)
@@ -142,7 +127,7 @@ def llm_filter_predictions(
     return {
         "related_events": related_events,
         "summary": summary,
-        "model": model_used,
+        "model": model_name,
         "skipped": False,
         "provider": "gemini",
     }

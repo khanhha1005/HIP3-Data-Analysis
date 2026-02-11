@@ -38,7 +38,6 @@ from src.llm_predictions import (
     build_event_payload,
     has_gemini_key,
     llm_filter_predictions,
-    DEFAULT_GEMINI_MODEL,
     COMPANY_ALIASES,
 )
 from src.options import fetch_options_data, clear_options_cache
@@ -1020,12 +1019,7 @@ def main():
         llm_enabled = st.checkbox(
             "🤖 Use LLM to filter related predictions",
             value=has_gemini_key(),
-            help="Requires GEMINI_API_KEY in your environment.",
-        )
-        llm_model = st.text_input(
-            "LLM model",
-            value=DEFAULT_GEMINI_MODEL,
-            help="Overrides default Gemini model.",
+            help="Requires GEMINI_API_KEY in your environment. Uses models/gemini-2.0-flash.",
         )
         if llm_enabled and not has_gemini_key():
             st.info("Set `GEMINI_API_KEY` to enable Gemini filtering.")
@@ -1222,12 +1216,8 @@ def main():
             }
 
         @st.cache_data(ttl=900, show_spinner=False)
-        def llm_filter_predictions_cached(symbol, events_payload, model_name):
-            return llm_filter_predictions(
-                symbol,
-                events_payload,
-                model=model_name,
-            )
+        def llm_filter_predictions_cached(symbol, events_payload):
+            return llm_filter_predictions(symbol, events_payload)
 
         @st.cache_data(ttl=3600)
         def search_polymarket_events(query, max_pages=3):
@@ -1409,7 +1399,7 @@ def main():
                 llm_progress_text.text(f"🤖 LLM filtering {ticker}... ({idx + 1}/{llm_total})")
                 try:
                     payload = build_event_payload(events)
-                    llm_results[ticker] = llm_filter_predictions_cached(ticker, payload, llm_model)
+                    llm_results[ticker] = llm_filter_predictions_cached(ticker, payload)
                 except Exception as e:
                     llm_results[ticker] = {"related_events": [], "summary": "", "error": str(e)}
             llm_progress_bar.empty()
