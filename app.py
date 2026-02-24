@@ -47,8 +47,7 @@ from src.utils import extract_ticker, format_currency, format_pct
 from macro_panel import fetch_prices_strict, FetchConfig, PANEL, DISPLAY_ORDER, compute_snapshot
 from treasury_yields import fetch_treasury_yields, SERIES
 from kalshi import (
-    fetch_events,
-    filter_events_by_tickers,
+    fetch_stock_market_financial_events,
     extract_yes_probability,
     market_target_label,
 )
@@ -1582,146 +1581,75 @@ def main():
     # =============================================================================
     with tab_kalshi:
         st.markdown("### 📉 Kalshi Predictions")
-        st.caption("Market predictions and probability analysis from Kalshi (Open Markets)")
+        st.caption("Stock market & financial predictions from Kalshi (Open Markets) — no ticker filter")
 
-        unique_tickers = list(set([extract_ticker(s) for s in selected_symbols]))
-        unique_tickers.sort()
+        @st.cache_data(ttl=900)
+        def fetch_kalshi_stock_financial_events():
+            return fetch_stock_market_financial_events(status="open", limit=500)
 
-        if not unique_tickers:
-            st.info("Please select symbols in the sidebar to view Kalshi predictions.")
+        def sort_key_from_label(label):
+            nums = re.findall(r"\d+(?:\.\d+)?", str(label).replace(",", ""))
+            return float(nums[0]) if nums else 0.0
+
+        with st.spinner("Fetching Kalshi stock market & financial events..."):
+            try:
+                events = fetch_kalshi_stock_financial_events()
+            except Exception as e:
+                st.error(f"Failed to fetch Kalshi data: {e}")
+                events = []
+
+        if not events:
+            st.info("No stock market or financial events found on Kalshi. Try again later.")
         else:
-            @st.cache_data(ttl=900)
-            def fetch_kalshi_open_events():
-                return fetch_events(status="open", with_nested_markets=True, limit=500)
+            st.success(f"Found {len(events)} stock market & financial event(s)")
+            st.markdown("---")
 
-            def sort_key_from_label(label):
-                nums = re.findall(r"\d+(?:\.\d+)?", str(label).replace(",", ""))
-                return float(nums[0]) if nums else 0.0
-
-            def compute_kalshi_perp_signal(events):
-                long_keywords = ["long", "bullish", "up", "rise", "higher", "above", "increase"]
-                short_keywords = ["short", "bearish", "down", "fall", "lower", "below", "decrease"]
-                long_probs, short_probs, used_markets = [], [], []
-                for ev in events:
-                    for market in ev.get("markets", []) or []:
-                        q = " ".join([
-                            str(market.get("title", "")),
-                            str(market.get("subtitle", "")),
-                        ]).lower()
-                        yes_p = extract_yes_probability(market)
-                        if yes_p is None:
-                            continue
-                        if any(k in q for k in long_keywords):
-                            long_probs.append(yes_p)
-                            used_markets.append({
-                                "Event": ev.get("title", "Unknown"),
-                                "Market": market_target_label(market),
-                                "Direction": "Long/Bullish",
-                                "Yes Probability": yes_p,
-                            })
-                        if any(k in q for k in short_keywords):
-                            short_probs.append(yes_p)
-                            used_markets.append({
-                                "Event": ev.get("title", "Unknown"),
-                                "Market": market_target_label(market),
-                                "Direction": "Short/Bearish",
-                                "Yes Probability": yes_p,
-                            })
-                long_avg = float(np.mean(long_probs)) if long_probs else None
-                short_avg = float(np.mean(short_probs)) if short_probs else None
-                if long_avg is None and short_avg is None:
-                    return {"signal": "No signal", "long_avg": None, "short_avg": None, "count": 0, "markets": []}
-                if short_avg is None:
-                    return {"signal": "Long bias", "long_avg": long_avg, "short_avg": None, "count": len(long_probs), "markets": used_markets}
-                if long_avg is None:
-                    return {"signal": "Short bias", "long_avg": None, "short_avg": short_avg, "count": len(short_probs), "markets": used_markets}
-                diff = long_avg - short_avg
-                signal = "Long bias" if diff > 0.1 else ("Short bias" if diff < -0.1 else "Neutral")
-                return {"signal": signal, "long_avg": long_avg, "short_avg": short_avg, "count": len(long_probs) + len(short_probs), "markets": used_markets}
-
-            with st.spinner("Fetching Kalshi open events..."):
-                try:
-                    all_events = fetch_kalshi_open_events()
-                except Exception as e:
-                    st.error(f"Failed to fetch Kalshi data: {e}")
-                    all_events = []
-
-            by_ticker = filter_events_by_tickers(all_events, unique_tickers)
-            total_events = sum(len(v) for v in by_ticker.values())
-
-            if total_events == 0:
-                st.info(f"No Kalshi events found for {', '.join(unique_tickers)}. Try selecting other symbols or check back later.")
-            else:
-                st.success(f"Found {total_events} event(s) across {len([t for t in unique_tickers if by_ticker[t]])} ticker(s)")
-                st.markdown("---")
-
-                for ticker in unique_tickers:
-                    events = by_ticker.get(ticker, [])
-                    if not events:
-                        continue
-                    st.markdown(f"### 📊 {ticker} Predictions (Kalshi)")
-                    perp_signal = compute_kalshi_perp_signal(events)
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Signal", perp_signal["signal"])
-                    with col2:
-                        la = perp_signal.get("long_avg")
-                        st.metric("Long prob (avg)", f"{la:.1%}" if la is not None else "N/A")
-                    with col3:
-                        sa = perp_signal.get("short_avg")
-                        st.metric("Short prob (avg)", f"{sa:.1%}" if sa is not None else "N/A")
-                    if perp_signal.get("count", 0) > 0:
-                        markets_df = pd.DataFrame(perp_signal.get("markets", []))
-                        if not markets_df.empty:
-                            st.dataframe(markets_df, use_container_width=True, hide_index=True)
-                    st.markdown("---")
-
-                    for event in events:
-                        markets = event.get("markets", [])
-                        if not markets:
-                            continue
-                        rows, seen_labels = [], {}
-                        for m in markets:
-                            label = market_target_label(m)
-                            yes_p = extract_yes_probability(m)
-                            if yes_p is not None:
-                                if label not in seen_labels or yes_p > seen_labels[label]:
-                                    seen_labels[label] = yes_p
-                        for label, prob in seen_labels.items():
-                            rows.append({"Target": label, "Probability": prob, "SortKey": sort_key_from_label(label)})
-                        if len(rows) <= 1:
-                            continue
-                        df = pd.DataFrame(rows).sort_values(by="SortKey")
-                        if df["Probability"].fillna(0).max() <= 0:
-                            continue
-                        event_title = event.get("title", "Unknown Event")
-                        close_time = markets[0].get("close_time") if markets else None
-                        with st.expander(f"📈 {event_title}", expanded=True):
-                            if close_time:
-                                try:
-                                    ct = datetime.fromisoformat(close_time.replace("Z", "+00:00"))
-                                    st.caption(f"Close: {ct.strftime('%Y-%m-%d %H:%M UTC')}")
-                                except Exception:
-                                    st.caption(f"Close: {close_time}")
-                            fig = go.Figure()
-                            colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df["Probability"]]
-                            fig.add_trace(go.Bar(
-                                x=df["Target"],
-                                y=df["Probability"],
-                                marker_color=colors,
-                                text=[f"{p:.1%}" for p in df["Probability"]],
-                                textposition="outside",
-                            ))
-                            fig.update_layout(
-                                xaxis_title="Prediction Target",
-                                yaxis_title="Probability",
-                                yaxis_tickformat=".0%",
-                                template="plotly_white",
-                                hovermode="x unified",
-                                height=400,
-                            )
-                            fig.update_xaxes(tickangle=45)
-                            st.plotly_chart(fig, use_container_width=True, key=f"kalshi_{ticker}_{event.get('event_ticker', event_title)}")
+            for event in events:
+                markets = event.get("markets", [])
+                if not markets:
+                    continue
+                rows, seen_labels = [], {}
+                for m in markets:
+                    label = market_target_label(m)
+                    yes_p = extract_yes_probability(m)
+                    if yes_p is not None:
+                        if label not in seen_labels or yes_p > seen_labels[label]:
+                            seen_labels[label] = yes_p
+                for label, prob in seen_labels.items():
+                    rows.append({"Target": label, "Probability": prob, "SortKey": sort_key_from_label(label)})
+                if len(rows) <= 1:
+                    continue
+                df = pd.DataFrame(rows).sort_values(by="SortKey")
+                if df["Probability"].fillna(0).max() <= 0:
+                    continue
+                event_title = event.get("title", "Unknown Event")
+                close_time = markets[0].get("close_time") if markets else None
+                with st.expander(f"📈 {event_title}", expanded=True):
+                    if close_time:
+                        try:
+                            ct = datetime.fromisoformat(close_time.replace("Z", "+00:00"))
+                            st.caption(f"Close: {ct.strftime('%Y-%m-%d %H:%M UTC')}")
+                        except Exception:
+                            st.caption(f"Close: {close_time}")
+                    fig = go.Figure()
+                    colors = ['#10b981' if p > 0.2 else '#f43f5e' if p < 0.05 else '#6366f1' for p in df["Probability"]]
+                    fig.add_trace(go.Bar(
+                        x=df["Target"],
+                        y=df["Probability"],
+                        marker_color=colors,
+                        text=[f"{p:.1%}" for p in df["Probability"]],
+                        textposition="outside",
+                    ))
+                    fig.update_layout(
+                        xaxis_title="Prediction Target",
+                        yaxis_title="Probability",
+                        yaxis_tickformat=".0%",
+                        template="plotly_white",
+                        hovermode="x unified",
+                        height=400,
+                    )
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True, key=f"kalshi_{event.get('event_ticker', event_title)}")
 
     # =============================================================================
     # TAB 7: Market Index & Macro Event

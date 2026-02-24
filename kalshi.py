@@ -140,3 +140,73 @@ def market_target_label(market: Dict[str, Any]) -> str:
         or market.get("ticker")
         or "Unknown"
     )
+
+
+# Keywords indicating stock market or financials (broad, not tied to tickers or price)
+STOCK_MARKET_FINANCIAL_KEYWORDS = [
+    "stock", "stocks", "share", "shares", "equity", "equities",
+    "market", "financial", "finance", "trading", "trade",
+    "index", "s&p", "sp500", "nasdaq", "dow", "vix",
+    "close", "above", "below", "price", "target",
+    "earnings", "revenue", "eps", "guidance",
+    "fed", "federal reserve", "interest rate", "rates", "fomc",
+    "treasury", "bond", "yield", "inflation", "cpi", "pce", "ppi",
+    "gdp", "unemployment", "jobs", "employment",
+    "volatility", "dollar", "dxy", "oil", "gold",
+]
+
+
+def event_is_stock_market_or_financials(event: Dict[str, Any]) -> bool:
+    """
+    Check if event is about stock market or financials in general.
+    No ticker or price-specific filter — broad match for any stock/financial topic.
+    """
+    text_parts = [
+        event.get("title"),
+        event.get("sub_title"),
+        event.get("series_ticker"),
+    ]
+    for m in event.get("markets") or []:
+        text_parts.append(m.get("title"))
+        text_parts.append(m.get("subtitle"))
+        text_parts.append(m.get("yes_sub_title"))
+    text = " ".join(str(x).lower() for x in text_parts if x)
+    return any(kw in text for kw in STOCK_MARKET_FINANCIAL_KEYWORDS)
+
+
+def fetch_stock_market_financial_events(
+    status: str = "open",
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    """
+    Fetch all Kalshi events that are about stock market or financials.
+    No ticker or price filter — returns any event matching stock/financial keywords.
+
+    Args:
+        status: Event status filter - 'open', 'closed', 'settled', or '' for all.
+        limit: Max events per page (pagination still fetches all).
+
+    Returns:
+        List of event dicts with nested markets.
+    """
+    events = fetch_events(
+        status=status,
+        with_nested_markets=True,
+        limit=limit,
+    )
+    return [e for e in events if event_is_stock_market_or_financials(e)]
+
+
+# --- Example usage ---
+if __name__ == "__main__":
+    print("Fetching stock market & financial events from Kalshi...")
+    events = fetch_stock_market_financial_events(status="open")
+    print(f"Found {len(events)} event(s)\n")
+    for ev in events:
+        print(f"  - {ev.get('title', 'N/A')}")
+        print(f"    Series: {ev.get('series_ticker')} | Event: {ev.get('event_ticker')}")
+        for m in ev.get("markets") or []:
+            prob = extract_yes_probability(m)
+            prob_str = f"{prob:.1%}" if prob is not None else "N/A"
+            print(f"    Market: {market_target_label(m)} | YES prob: {prob_str}")
+        print()
